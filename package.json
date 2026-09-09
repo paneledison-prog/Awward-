@@ -12,7 +12,9 @@
     "test": "tsc -p tsconfig.scripts.json && node --test .dev-build/test/*.test.js",
     "fixtures": "node scripts/fixture-server.mjs",
     "smoke": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/try-all-fixtures.js",
-    "record-fixture": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/try-harvest.js"
+    "record-fixture": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/try-harvest.js",
+    "dev:lan": "next dev -H 0.0.0.0 -p ${PORT:-3000}",
+    "start:lan": "next start -H 0.0.0.0 -p ${PORT:-3000}"
   },
   "dependencies": {
     "culori": "4.0.1",

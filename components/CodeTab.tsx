@@ -20,7 +20,13 @@ export function CodeTab({ files }: { files: EmittedFile[] }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[290px_1fr]">
-      <nav className="rounded-lg border border-line bg-panel p-2">
+      {/*
+        min-w-0 is load-bearing: a grid item defaults to min-width:auto, so the
+        longest file description sets the column's floor and pushes the whole
+        page wider than a phone screen. truncate cannot shrink past that floor
+        without it.
+      */}
+      <nav className="min-w-0 rounded-lg border border-line bg-panel p-2">
         <ul className="flex flex-col">
           {files.map((entry) => (
             <li key={entry.path}>

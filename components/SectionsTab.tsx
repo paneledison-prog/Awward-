@@ -23,19 +23,28 @@ function SectionCard({ section }: { section: SectionSpec }) {
 
   return (
     <div className="rounded-lg border border-line bg-panel">
+      {/*
+        Wraps to two rows on a phone: index, kind and metrics stay on the first
+        line and the heading takes the second. Laid out as one row of fixed
+        columns it needs ~560px, which pushes the whole page sideways.
+      */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-4 px-4 py-3 text-left"
+        className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left sm:flex-nowrap sm:gap-4"
       >
-        <span className="w-6 shrink-0 font-mono text-xs text-fg-faint">{section.order + 1}</span>
-        <span className={`w-28 shrink-0 font-mono text-xs ${KIND_COLOR[section.kind] ?? 'text-fg-dim'}`}>
+        <span className="w-5 shrink-0 font-mono text-xs text-fg-faint sm:w-6">
+          {section.order + 1}
+        </span>
+        <span
+          className={`w-24 shrink-0 font-mono text-xs sm:w-28 ${KIND_COLOR[section.kind] ?? 'text-fg-dim'}`}
+        >
           {section.kind}
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm text-fg">
+        <span className="order-last w-full min-w-0 truncate text-sm text-fg sm:order-none sm:w-auto sm:flex-1">
           {section.heading || section.label}
         </span>
-        <span className="shrink-0 font-mono text-[11px] text-fg-faint">
+        <span className="ml-auto shrink-0 font-mono text-[11px] text-fg-faint sm:ml-0">
           {section.box[3]}px
           {section.layout.columns > 1 ? ` · ${section.layout.columns} cols` : ''}
           {section.repeat ? ` · ${section.repeat.count}×` : ''}

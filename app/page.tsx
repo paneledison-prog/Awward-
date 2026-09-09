@@ -85,14 +85,17 @@ export default function Home() {
     <main className="min-h-screen">
       <div className="grid-backdrop border-b border-line">
         <div className="mx-auto w-full max-w-6xl px-6 pb-10 pt-14">
-          <div className="mb-8 flex items-baseline gap-3">
+          {/* Stacks on phones: the tagline wraps into a ragged block beside
+              a 2xl heading otherwise. */}
+          <div className="mb-8 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
             <h1 className="text-2xl font-semibold tracking-tight text-fg">DesignDNA</h1>
             <p className="font-mono text-xs text-fg-faint">
               measure any page&rsquo;s design system → get build-ready code
             </p>
           </div>
 
-          <p className="mb-6 max-w-2xl text-sm leading-relaxed text-fg-dim">
+          {/* Clamped on phones so the input is reachable without scrolling. */}
+          <p className="mb-6 line-clamp-3 max-w-2xl text-sm leading-relaxed text-fg-dim sm:line-clamp-none">
             Enter a site. It renders in a real browser at three viewports, measures every computed
             style, and infers the design system — colors, type scale, spacing grid, radii, shadows,
             motion, breakpoints — then segments the page into sections and detects repeating
@@ -166,13 +169,13 @@ export default function Home() {
               </ul>
             ) : null}
 
-            <nav className="flex flex-wrap gap-1 border-b border-line">
+            <nav className="scroll-thin flex gap-1 overflow-x-auto border-b border-line">
               {TABS.map((entry) => (
                 <button
                   key={entry.id}
                   type="button"
                   onClick={() => setTab(entry.id)}
-                  className={`-mb-px border-b-2 px-4 py-2.5 text-sm transition ${
+                  className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm transition ${
                     tab === entry.id
                       ? 'border-accent text-fg'
                       : 'border-transparent text-fg-faint hover:text-fg-dim'
