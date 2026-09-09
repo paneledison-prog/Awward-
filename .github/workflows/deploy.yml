@@ -65,6 +65,20 @@ jobs:
           flyctl apps create "${{ inputs.app }}" --org personal \
             || echo "app already exists — continuing to deploy"
 
+      - name: Ensure the app has an IP address
+        # Without this the app deploys, runs, and is simply unreachable:
+        # <app>.fly.dev never resolves, and every check fails with a DNS error
+        # that says nothing about IPs. `fly launch` allocates these; creating an
+        # app through the dashboard or the GitHub flow does not. Both commands
+        # are idempotent.
+        run: |
+          echo "── current IPs ──"
+          flyctl ips list -a "${{ inputs.app }}" || true
+          flyctl ips allocate-v4 --shared -a "${{ inputs.app }}" || echo "v4 already allocated"
+          flyctl ips allocate-v6 -a "${{ inputs.app }}" || echo "v6 already allocated"
+          echo "── after allocation ──"
+          flyctl ips list -a "${{ inputs.app }}"
+
       - name: Deploy
         # --remote-only builds on Fly's builder, so the 2.5GB image never has to
         # be pushed from this runner. --ha=false keeps it to a single machine.
