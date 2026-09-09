@@ -11,8 +11,17 @@
  *   node scripts/smoke-container.mjs [baseUrl] [targetUrl]
  */
 
-const BASE = (process.argv[2] ?? process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
-const TARGET = process.argv[3] ?? process.env.SMOKE_TARGET_URL ?? 'http://127.0.0.1:4321/marketing.html';
+const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const BASE = (args[0] ?? process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
+const TARGET = args[1] ?? process.env.SMOKE_TARGET_URL ?? 'http://127.0.0.1:4321/marketing.html';
+
+/**
+ * Strict mode asserts the exact design system the bundled fixture is known to
+ * produce. Against any other page those numbers are meaningless, so --loose
+ * keeps the checks that hold for every site: the extraction finishes, a palette
+ * comes back, screenshots serve, and the bundle downloads.
+ */
+const STRICT = !process.argv.includes('--loose');
 
 /** Extraction renders three viewports plus a dark pass; allow for a cold start. */
 const EXTRACT_TIMEOUT_MS = 240_000;
@@ -38,7 +47,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   console.log(`base   : ${BASE}`);
-  console.log(`target : ${TARGET}\n`);
+  console.log(`target : ${TARGET}`);
+  console.log(`mode   : ${STRICT ? 'strict (fixture assertions on)' : 'loose'}\n`);
 
   /* --- the server is up and serving the app ------------------------------ */
   console.log('serving');
@@ -85,17 +95,28 @@ async function main() {
   /* --- it produced the design system the fixture is known to have --------- */
   console.log('\ninference');
   const roles = result.design.palette.roles;
-  for (const role of ['background', 'surface', 'foreground', 'muted', 'primary', 'border']) {
+  // Every page has a background and text; the rest depend on how much of a
+  // design system the page actually has.
+  for (const role of ['background', 'foreground']) {
     check(`role "${role}" resolved`, typeof roles[role] === 'string', 'missing');
   }
-  check('8 sections found', result.stats.sectionsFound === 8, `got ${result.stats.sectionsFound}`);
-  check(
-    '3 repeating components detected',
-    result.stats.componentsDetected === 3,
-    `got ${result.stats.componentsDetected}`,
-  );
-  check('at least 15 files emitted', result.files.length >= 15, `got ${result.files.length}`);
-  check('agent brief is substantial', result.agentPrompt.length > 5_000, `${result.agentPrompt.length} chars`);
+  check('at least one section found', result.stats.sectionsFound >= 1, `got ${result.stats.sectionsFound}`);
+  check('files emitted', result.files.length >= 5, `got ${result.files.length}`);
+  check('agent brief produced', result.agentPrompt.length > 500, `${result.agentPrompt.length} chars`);
+
+  if (STRICT) {
+    for (const role of ['surface', 'muted', 'primary', 'border']) {
+      check(`role "${role}" resolved`, typeof roles[role] === 'string', 'missing');
+    }
+    check('8 sections found', result.stats.sectionsFound === 8, `got ${result.stats.sectionsFound}`);
+    check(
+      '3 repeating components detected',
+      result.stats.componentsDetected === 3,
+      `got ${result.stats.componentsDetected}`,
+    );
+    check('at least 15 files emitted', result.files.length >= 15, `got ${result.files.length}`);
+    check('agent brief is substantial', result.agentPrompt.length > 5_000, `${result.agentPrompt.length} chars`);
+  }
 
   /* --- screenshots written at runtime are actually served ---------------- *
    * This is the assertion that earns the script its keep: Next serves public/
@@ -103,7 +124,11 @@ async function main() {
    * while every other check still passes.                                    */
   console.log('\nscreenshots');
   const shots = Object.entries(result.assets.screenshots);
-  check('three viewports captured', shots.length === 3, `got ${shots.length}`);
+  check(
+    STRICT ? 'three viewports captured' : 'at least one viewport captured',
+    STRICT ? shots.length === 3 : shots.length >= 1,
+    `got ${shots.length}`,
+  );
   for (const [viewport, path] of shots) {
     if (!path) {
       check(`${viewport} screenshot present`, false, 'no path');
@@ -123,11 +148,12 @@ async function main() {
   console.log('\nbundle');
   const zip = await fetch(`${BASE}/api/extract/${jobId}/download`);
   const zipBytes = (await zip.arrayBuffer()).byteLength;
+  const minZip = STRICT ? 100_000 : 10_000;
   check(
     `ZIP downloads (${Math.round(zipBytes / 1024)}KB)`,
     zip.status === 200 &&
       (zip.headers.get('content-type') ?? '').includes('zip') &&
-      zipBytes > 100_000,
+      zipBytes > minZip,
     `status ${zip.status}, ${zipBytes} bytes`,
   );
 

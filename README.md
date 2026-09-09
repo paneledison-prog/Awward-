@@ -77,6 +77,18 @@ of what those are for.
 
 Config is committed for three platforms; each reads the same `Dockerfile`.
 
+**Deploy from GitHub, no local CLI** — Actions → *Deploy to Fly* → Run workflow.
+It creates the app, deploys, waits for it to answer, and then extracts a real site
+on the live instance to prove it works. Requires one secret:
+
+```bash
+fly tokens create org        # paste the output as FLY_API_TOKEN
+```
+
+under Settings → Secrets and variables → Actions.
+
+Or deploy from your machine:
+
 | Platform | Command | Notes |
 |---|---|---|
 | **Fly.io** | `fly launch --copy-config --now` | `fly.toml` sets 1GB and scale-to-zero. Cheapest for bursty use. |

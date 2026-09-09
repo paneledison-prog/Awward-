@@ -1,0 +1,109 @@
+name: Deploy to Fly
+
+# Manual only. Deploying is not something a push should do by surprise, and the
+# app name has to be chosen by whoever owns the Fly account.
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Fly app name (must be globally unique, e.g. designdna-yourname)'
+        required: true
+        type: string
+      region:
+        description: 'Fly region — lhr london, iad virginia, syd sydney, fra frankfurt'
+        required: true
+        default: iad
+        type: string
+      smoke_target:
+        description: 'Site to extract as a post-deploy check'
+        required: false
+        default: 'https://example.com'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-fly
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy and verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Check the token is present
+        # Failing here with an explanation beats a confusing flyctl auth error.
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::FLY_API_TOKEN is not set. Create one with 'fly tokens create org', then add it under Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Point fly.toml at this app and region
+        # Editing the file rather than passing flags: fly.toml is the source of
+        # truth flyctl reads for everything else (memory, concurrency, health),
+        # and mixing the two is where deploys start disagreeing with the config.
+        run: |
+          sed -i "s|^app = .*|app = \"${{ inputs.app }}\"|" fly.toml
+          sed -i "s|^primary_region = .*|primary_region = \"${{ inputs.region }}\"|" fly.toml
+          echo "--- fly.toml ---"; head -12 fly.toml
+
+      - name: Create the app if it does not exist
+        run: |
+          flyctl apps create "${{ inputs.app }}" --org personal \
+            || echo "app already exists — continuing to deploy"
+
+      - name: Deploy
+        # --remote-only builds on Fly's builder, so the 2.5GB image never has to
+        # be pushed from this runner. --ha=false keeps it to a single machine.
+        run: |
+          flyctl deploy --remote-only --ha=false --wait-timeout 900
+
+      - name: Wait for the app to answer
+        run: |
+          URL="https://${{ inputs.app }}.fly.dev"
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null "$URL" && echo "serving after $((i*5))s" && exit 0
+            sleep 5
+          done
+          echo "::error::deployed app never answered at $URL"
+          flyctl logs --app "${{ inputs.app }}" --no-tail || true
+          exit 1
+
+      - name: Extract a real site on the deployed instance
+        # Loose mode: the fixture's exact section counts mean nothing here. This
+        # checks what matters — a real page renders, screenshots serve from the
+        # deployed filesystem, and the bundle downloads.
+        run: |
+          node scripts/smoke-container.mjs \
+            "https://${{ inputs.app }}.fly.dev" \
+            "${{ inputs.smoke_target }}" \
+            --loose
+
+      - name: Logs on failure
+        if: failure()
+        run: flyctl logs --app "${{ inputs.app }}" --no-tail || true
+
+      - name: Summary
+        if: success()
+        run: |
+          {
+            echo "## Deployed"
+            echo ""
+            echo "**https://${{ inputs.app }}.fly.dev**"
+            echo ""
+            echo "Region \`${{ inputs.region }}\`, 1GB, scales to zero when idle."
+            echo "Verified by extracting \`${{ inputs.smoke_target }}\` on the live instance."
+          } >> "$GITHUB_STEP_SUMMARY"
