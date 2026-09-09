@@ -49,6 +49,8 @@ interface Capture {
   harvest: HarvestResult;
   network: HarvestNetworkEntry[];
   screenshotPath?: string;
+  /** Set when the render succeeded but the screenshot did not. */
+  screenshotError?: string;
 }
 
 async function capture(
@@ -65,14 +67,22 @@ async function capture(
     const result = await harvest(session.page, url, viewport);
 
     let screenshotPath: string | undefined;
+    let screenshotError: string | undefined;
     if (takeScreenshot) {
-      const buffer = await screenshot(session.page, true);
-      const name = screenshotName(jobId, label);
-      await writeScreenshot(name, buffer);
-      screenshotPath = screenshotUrl(name);
+      try {
+        const buffer = await screenshot(session.page, result.documentHeight);
+        const name = screenshotName(jobId, label);
+        await writeScreenshot(name, buffer);
+        screenshotPath = screenshotUrl(name);
+      } catch (error) {
+        // A screenshot is a reference image; the design system is the product.
+        // Losing the whole extraction — every token, section and component
+        // already measured — because one capture timed out is a bad trade.
+        screenshotError = error instanceof Error ? error.message.split('\n')[0] : String(error);
+      }
     }
 
-    return { harvest: result, network: session.network, screenshotPath };
+    return { harvest: result, network: session.network, screenshotPath, screenshotError };
   } finally {
     await session.close();
   }
@@ -212,12 +222,19 @@ export async function runExtraction(
     );
   }
 
-  const others: { label: ViewportLabel; harvest: HarvestResult }[] = [];
+  if (primary.screenshotError) {
+    warnings.push(`Screenshot at ${primaryLabel} failed: ${primary.screenshotError}`);
+  }
+
+  const others: { label: ViewportLabel; harvest: HarvestResult; failed?: boolean }[] = [];
   let step = 26;
   for (const label of viewports.filter((v) => v !== primaryLabel)) {
     onProgress('render', `Rendering at ${label} (${VIEWPORTS[label].width}px)…`, step);
     const shot = await capture(options.url, label, jobId, true);
-    others.push({ label, harvest: shot.harvest });
+    others.push({ label, harvest: shot.harvest, failed: Boolean(shot.screenshotError) });
+    if (shot.screenshotError) {
+      warnings.push(`Screenshot at ${label} failed: ${shot.screenshotError}`);
+    }
     step += 12;
   }
 
@@ -240,7 +257,10 @@ export async function runExtraction(
   const screenshots: AssetManifest['screenshots'] = {};
   if (primary.screenshotPath) screenshots[primaryLabel] = primary.screenshotPath;
   for (const label of viewports.filter((v) => v !== primaryLabel)) {
-    screenshots[label] = screenshotUrl(screenshotName(jobId, label));
+    // Listing a URL for a capture that failed would hand the UI a broken image
+    // and put a 404 in every bundle.
+    const shot = others.find((o) => o.label === label);
+    if (shot && !shot.failed) screenshots[label] = screenshotUrl(screenshotName(jobId, label));
   }
 
   onProgress('assets', 'Cataloguing fonts, icons and images…', 82);

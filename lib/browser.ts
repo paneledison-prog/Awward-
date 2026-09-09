@@ -32,8 +32,6 @@ function launchArgs(): string[] {
     '--hide-scrollbars',
     '--mute-audio',
     '--disable-blink-features=AutomationControlled',
-    // Keep animations from settling into a half-finished frame in screenshots.
-    '--force-prefers-reduced-motion=0',
   ];
   // Development escape hatch for proxies that re-terminate TLS with a private
   // CA the browser does not trust. Off unless explicitly enabled.
@@ -148,6 +146,32 @@ export async function loadAndSettle(page: Page, url: string, timeoutMs: number):
   await page.waitForTimeout(400);
 }
 
-export async function screenshot(page: Page, fullPage: boolean): Promise<Buffer> {
-  return page.screenshot({ fullPage, type: 'jpeg', quality: 82, scale: 'css' });
+/**
+ * Chromium cannot produce a single capture taller than this. A marketing page
+ * with a dozen scroll sections passes it easily, and asking anyway does not
+ * error cleanly — it hangs until the call times out.
+ */
+const MAX_SCREENSHOT_HEIGHT = 16_000;
+
+/** Longer than the default action timeout: a tall page legitimately takes a while. */
+const SCREENSHOT_TIMEOUT_MS = 60_000;
+
+export async function screenshot(page: Page, documentHeight: number): Promise<Buffer> {
+  const tooTall = documentHeight > MAX_SCREENSHOT_HEIGHT;
+  const width = page.viewportSize()?.width ?? 1440;
+
+  return page.screenshot({
+    // `animations: 'disabled'` is the important one. Without it Playwright waits
+    // for animations to settle, and a page with a looping hero animation never
+    // settles — the call just runs out its timeout.
+    animations: 'disabled',
+    caret: 'hide',
+    type: 'jpeg',
+    quality: 82,
+    scale: 'css',
+    timeout: SCREENSHOT_TIMEOUT_MS,
+    ...(tooTall
+      ? { clip: { x: 0, y: 0, width, height: MAX_SCREENSHOT_HEIGHT } }
+      : { fullPage: true }),
+  });
 }

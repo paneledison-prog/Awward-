@@ -1,0 +1,37 @@
+name: Fly diagnostics
+
+# Read-only look at a deployed app: machine state, memory size, IPs and recent
+# logs. Separate from deploy so checking why something broke never risks
+# changing it.
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Fly app name'
+        required: true
+        default: 'awward-stoe'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Machines
+        # Machine count matters: the job store is in memory, so two machines
+        # would mean a job created on one is invisible to the other.
+        run: flyctl status -a "${{ inputs.app }}" || true
+
+      - name: IPs
+        run: flyctl ips list -a "${{ inputs.app }}" || true
+
+      - name: Recent logs
+        # OOM kills show up here as "out of memory" / "OOM" around a restart.
+        run: timeout 60 flyctl logs -a "${{ inputs.app }}" --no-tail || true
