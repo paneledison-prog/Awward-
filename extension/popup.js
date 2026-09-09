@@ -9,10 +9,71 @@ function say(text, kind = '') {
 }
 
 let tab;
+let resultUrl = '';
+
+function showSite(t) {
+  let host = '';
+  try {
+    host = new URL(t?.url ?? '').host;
+  } catch {
+    host = '';
+  }
+  $('siteName').textContent = t?.title?.trim() || host || 'This page';
+  $('siteHost').textContent = host || '(no page)';
+  $('siteUrl').hidden = !host;
+
+  // The page's own favicon in the mark tile, when the browser has one; the
+  // asterisk stays as the fallback so the tile is never an empty square.
+  if (t?.favIconUrl) {
+    const img = document.createElement('img');
+    img.src = t.favIconUrl;
+    img.width = 22;
+    img.height = 22;
+    img.alt = '';
+    img.style.borderRadius = '5px';
+    img.onload = () => {
+      $('mark').textContent = '';
+      $('mark').append(img);
+    };
+  }
+}
+
+/** What the run actually did — every line is a fact this popup observed. */
+function summarize(shotMode, instance) {
+  const shots = {
+    full: 'Full-page screenshot stitched',
+    viewport: 'Visible area captured',
+    none: 'Screenshots skipped',
+  };
+  let instanceHost = instance;
+  try {
+    instanceHost = new URL(instance).host;
+  } catch {
+    /* Shown verbatim if it will not parse. */
+  }
+
+  const lines = [
+    `Design measured on ${$('siteHost').textContent}`,
+    shots[shotMode] ?? shots.full,
+    `Analyzed by ${instanceHost}`,
+    'Code bundle ready to download',
+  ];
+
+  const list = $('summary');
+  list.textContent = '';
+  for (const text of lines) {
+    const li = document.createElement('li');
+    const tick = document.createElement('span');
+    tick.className = 'tick';
+    tick.textContent = '✓';
+    li.append(tick, document.createTextNode(text));
+    list.append(li);
+  }
+}
 
 (async () => {
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  $('pageUrl').textContent = tab?.url ?? '(no page)';
+  showSite(tab);
 
   const { instance = '' } = await chrome.storage.sync.get('instance');
   $('instance').value = instance;
@@ -20,6 +81,13 @@ let tab;
   const { shotMode = 'full' } = await chrome.storage.sync.get('shotMode');
   $('shot').value = shotMode;
 })();
+
+$('explore').addEventListener('click', async () => {
+  if (resultUrl) await chrome.tabs.create({ url: resultUrl });
+  window.close();
+});
+
+$('close').addEventListener('click', () => window.close());
 
 $('go').addEventListener('click', async () => {
   const instance = $('instance').value.trim().replace(/\/$/, '');
@@ -51,13 +119,16 @@ $('go').addEventListener('click', async () => {
   // carries on rather than logging a channel error for every progress update.
   const port = chrome.runtime.connect({ name: 'designdna' });
 
-  port.onMessage.addListener(async (msg) => {
+  port.onMessage.addListener((msg) => {
     if (msg.type === 'progress') return say(msg.text);
 
     if (msg.type === 'done') {
-      say('Done — opening results.', 'ok');
-      await chrome.tabs.create({ url: msg.url });
-      window.close();
+      // The results tab is opened by Explore, not automatically: the summary is
+      // the only place the popup can report what it did before it closes.
+      resultUrl = msg.url;
+      summarize(shotMode, instance);
+      $('setup').hidden = true;
+      $('done').hidden = false;
       return;
     }
 
