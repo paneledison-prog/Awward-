@@ -181,9 +181,20 @@ self.designdna = { extract, captureFullPage, captureViewport };
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'extract') return false;
 
+  // The popup can close mid-extraction — a full-page capture takes tens of
+  // seconds — and responding to a closed channel throws. Guarding it keeps a
+  // real failure visible instead of buried under a channel error.
+  const respond = (payload) => {
+    try {
+      sendResponse(payload);
+    } catch {
+      /* popup went away; nothing to report to */
+    }
+  };
+
   extract(message)
-    .then((url) => sendResponse({ ok: true, url }))
-    .catch((error) => sendResponse({ ok: false, error: String(error.message ?? error) }));
+    .then((url) => respond({ ok: true, url }))
+    .catch((error) => respond({ ok: false, error: String(error.message ?? error) }));
 
   // Keeps the message channel open for the async work above.
   return true;

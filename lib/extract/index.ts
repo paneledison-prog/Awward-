@@ -212,13 +212,6 @@ export async function runExtraction(
   onProgress('render', `Rendering at ${primaryLabel} (${VIEWPORTS[primaryLabel].width}px)…`, 12);
   const primary = await capture(options.url, primaryLabel, jobId, true);
 
-  // Check before doing any inference: everything downstream would otherwise
-  // describe the interstitial rather than the site.
-  const challenge = detectChallenge(primary.harvest);
-  if (challenge) {
-    throw new Error(challengeMessage(challenge, primary.harvest.finalUrl));
-  }
-
   if (primary.harvest.stats.truncated) {
     warnings.push(
       `The page exceeded the ${primary.harvest.nodes.length}-element analysis cap; very deep subtrees were skipped.`,
@@ -273,6 +266,7 @@ export async function runExtraction(
     network: primary.network,
     screenshots,
     contentMode: options.contentMode,
+    source: 'server',
     emitReact: options.emitReact,
     emitHtml: options.emitHtml,
     warnings,
@@ -290,6 +284,8 @@ export interface AnalysisInput {
   network: HarvestNetworkEntry[];
   screenshots: AssetManifest['screenshots'];
   contentMode: ExtractOptions['contentMode'];
+  /** Which browser rendered this. Decides what a bot check means and advises. */
+  source?: 'server' | 'browser';
   emitReact: boolean;
   emitHtml: boolean;
   warnings: string[];
@@ -308,6 +304,14 @@ export interface AnalysisInput {
  */
 export async function analyze(input: AnalysisInput): Promise<ExtractionResult> {
   const { jobId, primary, others, dark, network, warnings, onProgress } = input;
+
+  // Before any inference, whichever browser rendered this: everything
+  // downstream would otherwise describe the interstitial rather than the site,
+  // and would look entirely normal doing it.
+  const challenge = detectChallenge(primary);
+  if (challenge) {
+    throw new Error(challengeMessage(challenge, primary.finalUrl, input.source ?? 'server'));
+  }
 
   onProgress('design', 'Inferring the design system…', 62);
   const design = buildDesignSystem(primary, network, dark);

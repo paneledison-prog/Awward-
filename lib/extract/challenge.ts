@@ -70,13 +70,31 @@ export function detectChallenge(harvest: HarvestResult): ChallengeVerdict | null
   };
 }
 
-export function challengeMessage(verdict: ChallengeVerdict, url: string): string {
+/**
+ * The right advice depends on which browser did the rendering, and the two are
+ * opposites: a server-side block is solved by measuring in your own browser,
+ * while a browser-side one means the challenge simply had not cleared yet.
+ */
+export function challengeMessage(
+  verdict: ChallengeVerdict,
+  url: string,
+  source: 'server' | 'browser' = 'server',
+): string {
+  const seen = `${url} served a ${verdict.vendor} bot check instead of the page (matched "${verdict.evidence}").`;
+
+  if (source === 'browser') {
+    return [
+      seen,
+      'The harvest captured the check rather than the site — it was still on screen',
+      'when the snippet ran. Wait for the real page to finish loading, then run it again.',
+    ].join(' ');
+  }
+
   return [
-    `${url} served a ${verdict.vendor} bot check instead of the page`,
-    `(matched "${verdict.evidence}").`,
-    'The site is choosing not to serve automated browsers, so there is nothing',
-    'here to extract — any design system reported would be the challenge page\'s,',
-    'not the site\'s. Try a site that serves its content directly, or a page you',
-    'control and can allow.',
+    seen,
+    'The site does not serve automated browsers, and nothing here will change that.',
+    'But you can open it yourself: use "Run it in your own browser" on the DesignDNA',
+    'front page to measure the site in the tab you already have open. Same measurement,',
+    'same output — it just runs where the page actually loads.',
   ].join(' ');
 }

@@ -138,6 +138,7 @@ export async function POST(request: Request) {
     network,
     screenshots,
     contentMode: job.options.contentMode,
+    source: 'browser',
     emitReact: true,
     emitHtml: true,
     warnings,

@@ -149,7 +149,9 @@ export default function Home() {
           <SearchPanel busy={busy} onExtract={extract} />
 
           <div className="mt-5">
-            <BrowserHarvest />
+            {/* Opened automatically when the failure is the one it solves —
+                being told the fix exists is no use if it stays collapsed. */}
+            <BrowserHarvest startOpen={/bot check/i.test(error)} />
           </div>
         </div>
       </div>

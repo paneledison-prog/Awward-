@@ -8,10 +8,10 @@ import { useState } from 'react';
  * Shown by default rather than hidden behind an error, because the sites people
  * most want to extract are disproportionately the ones behind bot protection.
  */
-export function BrowserHarvest() {
+export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
 
   const copySnippet = async () => {
     setError('');
@@ -30,7 +30,9 @@ export function BrowserHarvest() {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left"
+        className={`flex w-full items-center gap-3 px-4 py-3 text-left ${
+          startOpen ? 'bg-accent/5' : ''
+        }`}
       >
         <span className="text-fg-faint">{open ? '−' : '+'}</span>
         <span className="text-sm text-fg-dim">
