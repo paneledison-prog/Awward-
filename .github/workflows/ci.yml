@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push makes an in-flight run irrelevant; the container job is slow
+# enough that letting superseded runs finish wastes real time.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typecheck, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Nothing in this job launches a browser — the inference tests run against
+      # a recorded harvest — so skip a ~150MB download.
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  container:
+    name: Build image and extract inside it
+    needs: checks
+    runs-on: ubuntu-latest
+    # The Playwright base image is ~2.5GB to pull, and the extraction itself
+    # renders four times.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build image
+        run: docker build -t designdna:ci .
+
+      - name: Serve the fixture site
+        # The extraction target is a local fixture, so this check never depends
+        # on a third-party site being up or unchanged.
+        run: |
+          node scripts/fixture-server.mjs &
+          for i in $(seq 1 20); do
+            curl -sf -o /dev/null http://127.0.0.1:4321/marketing.html && exit 0
+            sleep 1
+          done
+          echo "fixture server did not start"; exit 1
+
+      - name: Start the container
+        # Host networking so the container can reach the fixture server on
+        # 127.0.0.1:4321. PORT is set explicitly to mirror what a platform injects.
+        run: |
+          docker run -d --name designdna \
+            --network host \
+            -e PORT=3000 \
+            designdna:ci
+
+      - name: Wait for it to serve
+        # This is the step that fails when the server binds to loopback inside
+        # the container rather than 0.0.0.0.
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:3000/ && echo "ready after ${i}s" && exit 0
+            sleep 1
+          done
+          echo "container never served a request"; exit 1
+
+      - name: Extract inside the container
+        run: node scripts/smoke-container.mjs http://127.0.0.1:3000 http://127.0.0.1:4321/marketing.html
+
+      - name: Container logs
+        if: failure()
+        run: docker logs designdna || true

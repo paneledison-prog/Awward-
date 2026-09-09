@@ -14,7 +14,8 @@
     "smoke": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/try-all-fixtures.js",
     "record-fixture": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/try-harvest.js",
     "dev:lan": "next dev -H 0.0.0.0 -p ${PORT:-3000}",
-    "start:lan": "next start -H 0.0.0.0 -p ${PORT:-3000}"
+    "start:lan": "next start -H 0.0.0.0 -p ${PORT:-3000}",
+    "smoke:container": "node scripts/smoke-container.mjs"
   },
   "dependencies": {
     "culori": "4.0.1",

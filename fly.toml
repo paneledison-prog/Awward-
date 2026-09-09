@@ -1,4 +1,8 @@
-# Fly.io. Deploy with:  fly launch --copy-config --now
+# Fly.io.  fly launch --copy-config --now
+#
+# Two values here need changing at launch:
+#   app            — must be globally unique; `fly launch` will prompt and rewrite it
+#   primary_region — set to whichever region is near you (`fly platform regions`)
 app = "designdna"
 primary_region = "iad"
 

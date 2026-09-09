@@ -1,5 +1,7 @@
 # DesignDNA
 
+[![CI](https://github.com/paneledison-prog/Awward-/actions/workflows/ci.yml/badge.svg)](https://github.com/paneledison-prog/Awward-/actions/workflows/ci.yml)
+
 Enter a website. Get its design system measured, its layout mapped, and a brief
 you can paste straight into an AI coding agent to rebuild it.
 
@@ -84,10 +86,13 @@ Config is committed for three platforms; each reads the same `Dockerfile`.
 After deploying, open the URL and extract something. First request is slow if the
 platform scales to zero.
 
-> These files are written but unverified: they were authored in an environment
-> with no Docker daemon and no network access to any hosting provider, so the
-> image has never been built. Expect to adjust the plan or region; the app
-> itself is verified working under `next start`.
+The container image is built and exercised on every push by the `container` job
+in CI: it starts the image, runs a full extraction inside it against a local
+fixture, and asserts that the screenshots and ZIP actually download. A green badge
+means the image really works, not just that it compiled.
+
+The hosting configs themselves (plan names, regions) have not been run against a
+live provider account — expect to adjust those.
 
 ### Local
 
@@ -129,13 +134,24 @@ All optional — see `.env.example`.
 ## Development
 
 ```bash
-npm test              # 25 inference tests, no browser required
-npm run build         # production build
+npm test               # 25 inference tests, no browser required
+npm run build          # production build
 npm run typecheck
-npm run fixtures      # serve test/fixtures on :4321
-npm run smoke         # extract all three fixtures end to end
+npm run fixtures       # serve test/fixtures on :4321
+npm run smoke          # extract all three fixtures end to end
+npm run smoke:container # drive a running instance over HTTP (what CI runs)
 npm run record-fixture # re-record the harvest the tests run against
 ```
+
+`smoke:container` takes a base URL, so it checks a local server, a container, or a
+deployed instance with the same assertions:
+
+```bash
+npm run smoke:container -- https://your-app.fly.dev
+```
+
+It is the only check that covers the things unit tests cannot see — whether the
+server bound somewhere reachable, and whether files written at runtime are served.
 
 Tests run against a recorded harvest in `test/fixtures/`. That is deliberate:
 the browser step produces one flat array of nodes, and every inference after it
