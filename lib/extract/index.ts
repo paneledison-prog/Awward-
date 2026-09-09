@@ -357,29 +357,31 @@ export async function analyze(input: AnalysisInput): Promise<ExtractionResult> {
 
   onProgress('emit', 'Generating tokens, components and the agent brief…', 90);
 
-  const prompt = emitAgentPrompt(page, design, sections, assets, input.contentMode);
-  const compact = emitCompactPrompt(page, design, sections, input.contentMode);
-
-  const files: EmittedFile[] = [
-    prompt,
-    compact,
+  // The brief describes the bundle it ships in, so everything else is emitted
+  // first and the manifest is handed to it.
+  const generated: EmittedFile[] = [
     emitDesignTokens(design),
     emitTokensCss(design),
     emitTailwindConfig(design),
     emitTailwindTheme(design),
   ];
 
-  if (input.emitReact) files.push(...emitReactSections(design, sections, input.contentMode));
+  if (input.emitReact) generated.push(...emitReactSections(design, sections, input.contentMode));
   if (input.emitHtml) {
-    files.push(...emitHtml(design, sections, input.contentMode, page.title, page.description));
+    generated.push(...emitHtml(design, sections, input.contentMode, page.title, page.description));
   }
 
-  files.push({
+  generated.push({
     path: 'spec.json',
     contents: JSON.stringify({ page, design, sections, assets }, null, 2),
     language: 'json',
     description: 'The complete extraction as machine-readable JSON.',
   });
+
+  const prompt = emitAgentPrompt(page, design, sections, assets, input.contentMode, generated);
+  const compact = emitCompactPrompt(page, design, sections, input.contentMode, assets);
+
+  const files: EmittedFile[] = [prompt, compact, ...generated];
 
   page.durationMs = Date.now() - input.startedAt;
 

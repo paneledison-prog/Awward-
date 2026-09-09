@@ -5,8 +5,14 @@ import type {
   EmittedFile,
   PageMeta,
   SectionSpec,
+  ViewportLabel,
 } from '../types';
+import { VIEWPORTS } from '../viewports';
 import { applyMode } from './content';
+
+/** What the ZIP will contain. The brief lists it so an agent that was handed
+ *  the archive knows what each file is before opening any of them. */
+export type BundleFile = Pick<EmittedFile, 'path' | 'description'>;
 
 /** Pipes and newlines break markdown tables; nothing else needs escaping. */
 const cell = (value: string | number | null | undefined): string =>
@@ -20,6 +26,84 @@ const table = (headers: string[], rows: (string | number | null | undefined)[][]
     ...rows.map((row) => `| ${row.map(cell).join(' | ')} |`),
   ].join('\n');
 };
+
+/** An aligned file tree. One column width for every row, so the descriptions
+ *  line up however long the longest path turns out to be. */
+function tree(rows: [string, string][]): string[] {
+  const width = Math.max(...rows.map(([path]) => path.length)) + 2;
+  return rows.map(([path, description], index) => {
+    const branch = index === rows.length - 1 ? '└──' : '├──';
+    return `${branch} ${path.padEnd(width)}${description}`;
+  });
+}
+
+/**
+ * §0 — what the reader is holding.
+ *
+ * An agent handed a folder of generated files guesses at their relationship:
+ * it will edit `index.html` and ignore the tokens, or treat the emitted React
+ * as the deliverable rather than as a starting point. Naming every file, its
+ * authority, and the order to read them costs a page and removes the guessing.
+ */
+function bundleSection(
+  page: PageMeta,
+  assets: AssetManifest,
+  files: BundleFile[],
+  mode: ContentMode,
+): string {
+  const shots = Object.entries(assets.screenshots) as [ViewportLabel, string][];
+
+  const out: string[] = [
+    '## 0. What you have been given',
+    '',
+    'This brief is one file in a **DesignDNA extraction bundle** — a ZIP produced by',
+    `rendering ${page.finalUrl} in a real browser and measuring it. If you were handed`,
+    'the archive, unzip it first; every path below is relative to its root.',
+    '',
+    '```',
+    'extraction.zip',
+    ...tree([
+      ['README.md', 'what the bundle is, in one page'],
+      ['AGENT_PROMPT.md', '← you are reading this: the full specification'],
+      ['AGENT_PROMPT.compact.md', 'the same brief, trimmed for small context windows'],
+      ...files
+        .filter((f) => !f.path.startsWith('AGENT_PROMPT'))
+        .map((f) => [f.path, f.description] as [string, string]),
+      [
+        'screenshots/',
+        shots.length
+          ? `full-page renders — ${shots.map(([vp]) => `${vp}.jpg`).join(', ')}`
+          : '(none captured for this run)',
+      ],
+    ]),
+    '```',
+    '',
+    '### How these relate',
+    '',
+    '| File | What it is | How to treat it |',
+    '| --- | --- | --- |',
+    '| `AGENT_PROMPT.md` | Measurements taken from the rendered page — computed styles, geometry, text | **Authoritative.** When it disagrees with any generated file, this wins |',
+    '| Token files | The same measurements as a drop-in theme | Install first; import everything else from them |',
+    '| Component / HTML files | Code generated *from* these measurements | A starting point, not a deliverable — rewrite freely to fit the target stack |',
+    '| `spec.json` | The entire extraction, machine-readable | Query it when you need a value this brief summarised |',
+    '| `screenshots/` | What the page actually looked like | The visual check on your build |',
+    '',
+    '### Read it in this order',
+    '',
+    '1. **This brief, §1** — put the design system into your theme config before writing markup.',
+    '2. **`screenshots/`** — look at them. The numbers describe the page; the screenshots show it.',
+    '3. **This brief, §2 and §3** — section order, then each section in detail.',
+    '4. **The generated component files** — only to see one way to express §3, then write your own.',
+    '',
+    mode === 'verbatim'
+      ? 'Copy in this brief is reproduced verbatim from the source page. It belongs to that site — keep it while building, replace it before shipping.'
+      : 'Copy in this brief is stand-in text matching the original word count and shape; replace it with your own.',
+    '',
+  ];
+
+  return out.join('\n');
+}
+
 
 function designSystemSection(design: DesignSystem): string {
   const out: string[] = ['## 1. Design system', ''];
@@ -249,7 +333,7 @@ function sectionDetail(section: SectionSpec, index: number, mode: ContentMode): 
   return out.join('\n');
 }
 
-function assetsSection(assets: AssetManifest): string {
+function assetsSection(assets: AssetManifest, documentHeight: number): string {
   const out: string[] = ['## 4. Assets', ''];
 
   const brand = assets.images.filter((i) => i.isBrandAsset);
@@ -287,16 +371,76 @@ function assetsSection(assets: AssetManifest): string {
     '',
   );
 
-  const shots = Object.entries(assets.screenshots);
-  if (shots.length) {
-    out.push('### Reference screenshots', '');
-    out.push(...shots.map(([vp, path]) => `- \`${vp}\`: \`${path}\``), '');
-  }
+  out.push(screenshotsSection(assets, documentHeight));
 
   return out.join('\n');
 }
 
-function buildInstructions(design: DesignSystem, sections: SectionSpec[], mode: ContentMode): string {
+/**
+ * The screenshots, described rather than listed.
+ *
+ * A bare list of paths gets ignored: an agent has no way to know these are
+ * full-page renders at a known width, taken in the same pass as every number
+ * in this brief, and therefore the one artifact that can settle a question the
+ * measurements leave open — what the page actually looks like.
+ */
+function screenshotsSection(assets: AssetManifest, documentHeight: number): string {
+  const shots = Object.entries(assets.screenshots) as [ViewportLabel, string][];
+
+  if (!shots.length) {
+    return [
+      '### Reference screenshots',
+      '',
+      '_None captured for this run._ Build from the measurements alone, and say so in your',
+      'summary rather than guessing at anything this brief does not state.',
+      '',
+    ].join('\n');
+  }
+
+  return [
+    '### Reference screenshots',
+    '',
+    `In the bundle under \`screenshots/\`. Each is a **full-page** render — the entire`,
+    `scroll height (${documentHeight}px at capture), not just the visible window — taken in`,
+    'the same pass that produced every measurement above, with animations disabled and the',
+    'text caret hidden so the image is stable.',
+    '',
+    table(
+      ['File', 'Viewport width', 'What it shows'],
+      shots.map(([vp, path]) => [
+        `\`screenshots/${vp}.jpg\``,
+        `${VIEWPORTS[vp]?.width ?? '—'}px`,
+        vp === 'desktop'
+          ? 'The layout §2 and §3 describe. Compare your build against this one first.'
+          : `The same page reflowed at ${VIEWPORTS[vp]?.width ?? '—'}px — column counts and hidden elements at this size`,
+      ]),
+    ),
+    '',
+    '**Use them for:**',
+    '',
+    '- Checking section order and vertical rhythm against §2 before you write any markup.',
+    '- Resolving anything the numbers under-determine: relative emphasis, image treatment,',
+    '  how much air sits around a heading, where a rule or divider actually falls.',
+    '- Verifying your finished build at each width, side by side, rather than by reading',
+    '  your own code back.',
+    '',
+    '**What they do not show:** hover, focus and active states; anything behind a tab,',
+    'accordion or modal that was closed at capture; content that loads on scroll after the',
+    'capture settled; and video or animation, which is frozen at a single frame.',
+    '',
+    'If you cannot open images, say so plainly and build from the measurements — do not',
+    'describe a screenshot you have not seen.',
+    '',
+  ].join('\n');
+}
+
+function buildInstructions(
+  design: DesignSystem,
+  sections: SectionSpec[],
+  mode: ContentMode,
+  assets: AssetManifest,
+): string {
+  const shots = Object.keys(assets.screenshots) as ViewportLabel[];
   const components = sections.filter((s) => s.repeat).map((s) => s.repeat!.componentName);
   const bodyFont = design.families.find((f) => f.usage === 'body');
   const displayFont = design.families.find((f) => f.usage === 'display');
@@ -304,6 +448,9 @@ function buildInstructions(design: DesignSystem, sections: SectionSpec[], mode: 
   return [
     '## 5. Build instructions',
     '',
+    shots.length
+      ? `0. Open \`screenshots/${shots[0]}.jpg\` and look at the page before writing anything. Everything below describes what is in that image.`
+      : '0. No screenshots were captured for this run; the measurements below are the only record of the page.',
     '1. Start from the design tokens. Put the color, type, spacing, radius and shadow values',
     '   into your theme configuration *before* writing any markup — every section below',
     '   references them by name.',
@@ -318,6 +465,11 @@ function buildInstructions(design: DesignSystem, sections: SectionSpec[], mode: 
     '### Acceptance criteria',
     '',
     '- Every color, font size and spacing value comes from the token set, not a literal.',
+    ...(shots.length
+      ? [
+          `- Your build at ${VIEWPORTS[shots[0]]?.width ?? '—'}px, screenshotted and placed beside \`screenshots/${shots[0]}.jpg\`, matches it in section order, proportion and density.`,
+        ]
+      : []),
     '- Section order and vertical rhythm match §2.',
     '- Repeating groups render from data, with the item count in §3.',
     '- The page reflows correctly at each declared breakpoint.',
@@ -340,6 +492,7 @@ export function emitAgentPrompt(
   sections: SectionSpec[],
   assets: AssetManifest,
   mode: ContentMode,
+  bundle: BundleFile[],
 ): EmittedFile {
   const parts: string[] = [];
 
@@ -359,6 +512,7 @@ export function emitAgentPrompt(
     parts.push('> **Capture caveats**', '>', ...page.warnings.map((w) => `> - ${w}`), '');
   }
 
+  parts.push(bundleSection(page, assets, bundle, mode));
   parts.push(designSystemSection(design));
 
   parts.push(
@@ -384,8 +538,8 @@ export function emitAgentPrompt(
     parts.push(sectionDetail(section, index, mode));
   }
 
-  parts.push(assetsSection(assets));
-  parts.push(buildInstructions(design, sections, mode));
+  parts.push(assetsSection(assets, page.documentHeight));
+  parts.push(buildInstructions(design, sections, mode, assets));
 
   return {
     path: 'AGENT_PROMPT.md',
@@ -407,7 +561,9 @@ export function emitCompactPrompt(
   design: DesignSystem,
   sections: SectionSpec[],
   mode: ContentMode,
+  assets: AssetManifest,
 ): EmittedFile {
+  const shots = Object.keys(assets.screenshots) as ViewportLabel[];
   const colors = Object.entries(design.palette.roles)
     .map(([role, hex]) => `${role}=${hex}`)
     .join(' · ');
@@ -421,6 +577,16 @@ export function emitCompactPrompt(
     `# Build brief (compact): ${page.title || page.finalUrl}`,
     '',
     `Source: ${page.finalUrl} · ${sections.length} sections · content: ${mode}`,
+    '',
+    'Measured from the rendered page, so the numbers are exact. This file is part of a',
+    'ZIP that also holds the full brief (`AGENT_PROMPT.md`), token files to import,',
+    'generated components as a starting point, `spec.json`, and:',
+    '',
+    shots.length
+      ? `- \`screenshots/\` — full-page renders at ${shots
+          .map((vp) => `${vp} ${VIEWPORTS[vp]?.width ?? '—'}px`)
+          .join(', ')}. Open them before building and compare your result against them after.`
+      : '- `screenshots/` — none captured for this run; build from the numbers alone.',
     '',
     '## Tokens',
     '',
@@ -455,7 +621,14 @@ export function emitCompactPrompt(
     }
   }
 
-  lines.push('', 'Build with the tokens above; do not hardcode values.', '');
+  lines.push(
+    '',
+    'Build with the tokens above; do not hardcode values.',
+    shots.length
+      ? `Check the finished build against \`screenshots/${shots[0]}.jpg\` at ${VIEWPORTS[shots[0]]?.width ?? '—'}px.`
+      : '',
+    '',
+  );
 
   return {
     path: 'AGENT_PROMPT.compact.md',

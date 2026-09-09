@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { nameFromUrl, readScreenshot } from '../screenshots';
-import type { ExtractionResult } from '../types';
+import { VIEWPORTS } from '../viewports';
+import type { ExtractionResult, ViewportLabel } from '../types';
 
 /**
  * Package everything into one download.
@@ -34,6 +35,16 @@ export async function buildZip(result: ExtractionResult): Promise<Buffer> {
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
 
+/** Names the widths: "at each viewport" tells a reader nothing they can check
+ *  their own build against. */
+function shotsLine(result: ExtractionResult): string {
+  const shots = Object.keys(result.assets.screenshots) as ViewportLabel[];
+  if (!shots.length) return '- `screenshots/` — empty; no screenshots were captured for this run.';
+  return `- \`screenshots/\` — full-page renders (entire scroll height, ${result.page.documentHeight}px) at ${shots
+    .map((vp) => `**${vp} ${VIEWPORTS[vp]?.width ?? '—'}px**`)
+    .join(', ')}. Compare your build against them.`;
+}
+
 function bundleReadme(result: ExtractionResult): string {
   const brandAssets = result.assets.images.filter((i) => i.isBrandAsset);
 
@@ -45,13 +56,14 @@ function bundleReadme(result: ExtractionResult): string {
     '## Start here',
     '',
     '- **`AGENT_PROMPT.md`** — paste into Claude Code, Cursor, or any coding agent.',
-    '  It is the complete build brief and the reason this bundle exists.',
+    '  It is the complete build brief and the reason this bundle exists. Its §0 explains',
+    '  every other file here and the order to read them in.',
     '- `AGENT_PROMPT.compact.md` — the same brief trimmed for small context windows.',
     '',
     '## Files',
     '',
     ...result.files.map((f) => `- \`${f.path}\` — ${f.description}`),
-    '- `screenshots/` — full-page renders at each viewport.',
+    shotsLine(result),
     '',
     '## What was measured',
     '',

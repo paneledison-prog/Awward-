@@ -1,11 +1,7 @@
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
-import type { HarvestNetworkEntry, ViewportConfig, ViewportLabel } from './types';
+import type { HarvestNetworkEntry, ViewportConfig } from './types';
 
-export const VIEWPORTS: Record<ViewportLabel, ViewportConfig> = {
-  desktop: { label: 'desktop', width: 1440, height: 900, isMobile: false },
-  tablet: { label: 'tablet', width: 768, height: 1024, isMobile: false },
-  mobile: { label: 'mobile', width: 390, height: 844, isMobile: true },
-};
+export { VIEWPORTS } from './viewports';
 
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) ' +
