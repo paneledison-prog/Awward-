@@ -81,7 +81,7 @@ export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
                   : 'bg-accent text-ink hover:bg-accent-dim'
               }`}
             >
-              {copied ? '✓ Copied — paste it in the console' : 'Copy console snippet'}
+              {copied ? '✓ Copied — now type "allow pasting" first' : 'Copy console snippet'}
             </button>
             <a
               href="/api/harvest-script"
@@ -91,6 +91,30 @@ export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
             >
               view the script
             </a>
+          </div>
+
+          {/* The extension needs none of the above, so it is offered as an
+              equal alternative rather than a footnote. */}
+          <div className="mt-6 rounded-md border border-line bg-panel-2 p-4">
+            <p className="mb-1 text-sm font-medium text-fg">
+              Skip the console entirely
+            </p>
+            <p className="mb-3 max-w-2xl text-xs leading-relaxed text-fg-dim">
+              The browser extension does the same thing in one click — no DevTools, no
+              &ldquo;allow pasting&rdquo;, and it captures a screenshot too. It also works on
+              sites whose content-security policy would block a pasted script.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href="/api/extension"
+                className="rounded-md border border-line-bright px-4 py-2 text-sm font-medium text-fg transition hover:border-accent/60"
+              >
+                ↓ Download extension (.zip)
+              </a>
+              <span className="font-mono text-[11px] text-fg-faint">
+                unzip → chrome://extensions → Developer mode → Load unpacked
+              </span>
+            </div>
           </div>
 
           {error ? <p className="mt-3 text-xs text-rose">{error}</p> : null}

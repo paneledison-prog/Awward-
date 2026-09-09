@@ -34,6 +34,7 @@ ENV NODE_ENV=production \
 
 COPY --from=proddeps /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
+COPY --from=build /app/extension ./extension
 COPY package.json next.config.mjs ./
 
 # Screenshots are written at runtime, so they cannot live under public/ — Next
