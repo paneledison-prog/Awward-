@@ -31,9 +31,18 @@ primary_region = "ams"
 
   [http_service.concurrency]
     type = "requests"
-    # One Chromium render at a time per machine keeps memory predictable.
-    hard_limit = 4
-    soft_limit = 2
+    # These count open HTTP connections, not extractions — a distinction that
+    # broke the app. An extraction holds an SSE progress stream open for its
+    # whole run, so a single user browsing plus one extraction sailed past a
+    # limit of 4, Fly started a second machine, and the follow-up request for
+    # the result landed there. The job store is in memory, so the second
+    # machine had never heard of the job and answered 404.
+    #
+    # The real constraint is CPU and memory during a render, not connection
+    # count, so these are set high enough that ordinary use never triggers
+    # scaling. Machine count is pinned to 1 at deploy instead.
+    hard_limit = 50
+    soft_limit = 25
 
 [[vm]]
   size = "shared-cpu-1x"

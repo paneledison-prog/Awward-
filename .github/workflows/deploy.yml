@@ -85,6 +85,17 @@ jobs:
         run: |
           flyctl deploy --remote-only --ha=false --wait-timeout 900
 
+      - name: Pin to a single machine
+        # Extraction state lives in memory: the job created by POST /api/extract
+        # is only visible to the machine that created it, and the SSE stream,
+        # the result fetch, the screenshots and the ZIP must all reach that same
+        # machine. A second machine silently answers 404 for all of them.
+        # Sharing state across machines would need an external store; until then
+        # the count is pinned.
+        run: |
+          flyctl scale count 1 --yes -a "${{ inputs.app }}"
+          flyctl status -a "${{ inputs.app }}"
+
       - name: Wait for the app to answer
         run: |
           URL="https://${{ inputs.app }}.fly.dev"

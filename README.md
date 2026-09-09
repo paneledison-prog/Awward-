@@ -211,6 +211,22 @@ logos are not: they belong to the source site. Brand assets are flagged in every
 brief, and switching content mode to **placeholder** gives you the same structure
 with stand-in text of matching length, so the layout holds while you write your own.
 
+## Scaling
+
+Extraction state is in memory. A job created by `POST /api/extract` is visible
+only to the process that created it, and the progress stream, the result, the
+screenshots and the ZIP must all reach that same process. **Run exactly one
+instance.**
+
+On Fly that means pinning `scale count 1` (the deploy workflow does this) and
+keeping the concurrency limits well above normal traffic — they count open
+connections, and an extraction holds a progress stream open for its whole run,
+so a low limit makes Fly start a second machine that answers 404 for every
+follow-up request.
+
+Running more than one instance needs the job store moved to something shared —
+Redis or Postgres — which is not implemented.
+
 ## Known limits
 
 - One page per extraction; multi-page crawling is not implemented.
