@@ -8,6 +8,7 @@ import { buildTypeScale, primaryFamily } from '../lib/extract/typography';
 import { buildSpacingScale } from '../lib/extract/spacing';
 import { buildBreakpoints, buildContainer, buildMotion, buildRadii } from '../lib/extract/effects';
 import { buildSections } from '../lib/extract/sections';
+import { challengeMessage, detectChallenge } from '../lib/extract/challenge';
 import { evaluateRobots, looksLikeUrl, normalizeUrl } from '../lib/resolve';
 import { placeholder } from '../lib/emit/content';
 import type { HarvestResult } from '../lib/types';
@@ -197,6 +198,39 @@ test('logo-cloud images are flagged as brand assets', () => {
   const logos = buildSections(harvest).find((s) => s.kind === 'logo-cloud');
   assert.ok(logos!.images.length >= 5);
   assert.ok(logos!.images.every((i) => i.role === 'logo' && i.isBrandAsset));
+});
+
+/* ------------------------------------------------------------------ */
+/* Bot-protection interstitials                                        */
+/* ------------------------------------------------------------------ */
+
+test('a bot challenge is detected rather than extracted', () => {
+  const challenge = {
+    ...harvest,
+    title: 'replit.com',
+    nodes: harvest.nodes.slice(0, 20).map((n, i) =>
+      i === 3 ? { ...n, text: 'Verify you are human' } : { ...n, text: '' },
+    ),
+    finalUrl: 'https://replit.com/',
+  };
+  const verdict = detectChallenge(challenge);
+  assert.ok(verdict, 'expected the challenge page to be flagged');
+  assert.equal(verdict.vendor, 'a bot-protection service');
+  assert.match(challengeMessage(verdict, 'https://replit.com/'), /bot check instead of the page/);
+});
+
+test('a real page is not mistaken for a challenge', () => {
+  // The fixture is a normal marketing page: no challenge phrasing, ~125 nodes.
+  assert.equal(detectChallenge(harvest), null);
+});
+
+test('a large page mentioning the phrasing is not flagged', () => {
+  // A security vendor's own site says "verify you are human" in its copy.
+  const marketing = {
+    ...harvest,
+    nodes: harvest.nodes.map((n, i) => (i === 5 ? { ...n, text: 'Verify you are human' } : n)),
+  };
+  assert.equal(detectChallenge(marketing), null, 'size is what separates the two');
 });
 
 /* ------------------------------------------------------------------ */

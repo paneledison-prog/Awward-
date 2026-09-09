@@ -24,6 +24,7 @@ import type {
   ViewportLabel,
 } from '../types';
 import { buildAssetManifest } from './assets';
+import { challengeMessage, detectChallenge } from './challenge';
 import { buildPalette } from './colors';
 import { columnCount, findLayoutContainer } from './components';
 import {
@@ -210,6 +211,13 @@ export async function runExtraction(
 
   onProgress('render', `Rendering at ${primaryLabel} (${VIEWPORTS[primaryLabel].width}px)…`, 12);
   const primary = await capture(options.url, primaryLabel, jobId, true);
+
+  // Check before doing any inference: everything downstream would otherwise
+  // describe the interstitial rather than the site.
+  const challenge = detectChallenge(primary.harvest);
+  if (challenge) {
+    throw new Error(challengeMessage(challenge, primary.harvest.finalUrl));
+  }
 
   if (primary.harvest.stats.truncated) {
     warnings.push(

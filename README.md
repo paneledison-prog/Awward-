@@ -227,6 +227,20 @@ follow-up request.
 Running more than one instance needs the job store moved to something shared —
 Redis or Postgres — which is not implemented.
 
+## Sites that block automated browsers
+
+Some sites sit behind bot protection — Cloudflare, DataDome, PerimeterX — and
+serve a "verify you are human" interstitial instead of the page. DesignDNA
+detects this and fails with a clear message naming the vendor, rather than
+extracting the challenge page and reporting its colours as the site's design
+system.
+
+This is not worked around, and there is no setting to bypass it. The
+interstitial is the site stating it does not want automated access; the tool
+honours that the same way it honours `robots.txt`. Most sites do not do this,
+and those that do usually serve their marketing pages freely even when the app
+itself is protected.
+
 ## Known limits
 
 - One page per extraction; multi-page crawling is not implemented.
