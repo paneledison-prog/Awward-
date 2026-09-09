@@ -32,18 +32,42 @@ jobs:
           node-version: '22'
 
       - name: Reachability
-        # Reported before the smoke run so a routing failure is distinguishable
-        # from an extraction failure.
+        # Reported before the smoke run, and split by curl's exit code: "cannot
+        # resolve" and "connected but wrong port" have completely different
+        # fixes, and a single "not serving" message sends you after the wrong one.
         run: |
           URL="${{ inputs.url }}"
+          HOST=$(echo "$URL" | sed -E 's|https?://||; s|/.*||')
+
+          echo "── DNS $HOST ──"
+          getent hosts "$HOST" || echo "(no DNS record)"
+
           echo "── HEAD $URL ──"
-          curl -sS -o /dev/null -D - --max-time 30 "$URL" || echo "(request failed)"
-          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$URL" || echo 000)
-          echo "status: $code"
-          if [ "$code" != "200" ]; then
-            echo "::error::$URL returned $code — the app is not serving. If the deploy reported success, check that fly.toml's PORT matches internal_port."
-            exit 1
-          fi
+          set +e
+          curl -sS -o /dev/null -D - --max-time 30 "$URL"
+          rc=$?
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$URL")
+          set -e
+          echo "curl exit: $rc   http status: ${code:-none}"
+
+          case "$rc" in
+            0)
+              if [ "$code" = "200" ]; then echo "serving"; exit 0; fi
+              echo "::error::$URL answered $code. The app is reachable but not healthy — check application logs."
+              exit 1 ;;
+            6)
+              echo "::error::$HOST does not resolve. The Fly app has no IP address allocated. Run: fly ips allocate-v4 --shared -a <app> && fly ips allocate-v6 -a <app>"
+              exit 1 ;;
+            7)
+              echo "::error::$HOST resolves but refused the connection. Nothing is listening on the routed port — check that fly.toml's PORT matches internal_port, and that the machine is started (fly status)."
+              exit 1 ;;
+            28)
+              echo "::error::$URL timed out. The machine may be stopped and failing to auto-start, or wedged during boot — check fly logs."
+              exit 1 ;;
+            *)
+              echo "::error::$URL unreachable (curl exit $rc)."
+              exit 1 ;;
+          esac
 
       - name: Extract a real site on it
         run: node scripts/smoke-container.mjs "${{ inputs.url }}" "${{ inputs.target }}" --loose
