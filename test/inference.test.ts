@@ -8,6 +8,7 @@ import { buildTypeScale, primaryFamily } from '../lib/extract/typography';
 import { buildSpacingScale } from '../lib/extract/spacing';
 import { buildBreakpoints, buildContainer, buildMotion, buildRadii } from '../lib/extract/effects';
 import { buildSections } from '../lib/extract/sections';
+import { describeHttpFailure } from '../lib/browser';
 import { challengeMessage, detectChallenge } from '../lib/extract/challenge';
 import { evaluateRobots, looksLikeUrl, normalizeUrl } from '../lib/resolve';
 import { placeholder } from '../lib/emit/content';
@@ -198,6 +199,32 @@ test('logo-cloud images are flagged as brand assets', () => {
   const logos = buildSections(harvest).find((s) => s.kind === 'logo-cloud');
   assert.ok(logos!.images.length >= 5);
   assert.ok(logos!.images.every((i) => i.role === 'logo' && i.isBrandAsset));
+});
+
+/* ------------------------------------------------------------------ */
+/* HTTP failures                                                       */
+/* ------------------------------------------------------------------ */
+
+test('error responses are described rather than extracted', () => {
+  assert.equal(describeHttpFailure(200, 'https://a.com'), null);
+  assert.equal(describeHttpFailure(301, 'https://a.com'), null);
+
+  // Narrowed once here: every code below returns a string by construction.
+  const describe = (status: number): string => {
+    const message = describeHttpFailure(status, 'https://a.com');
+    assert.ok(message, `expected HTTP ${status} to be described`);
+    return message;
+  };
+
+  assert.match(describe(403), /refused the request \(HTTP 403\)/);
+  // 403 is the case the in-browser path exists for, so it must say so.
+  assert.match(describe(403), /Run it in your own browser/);
+
+  assert.match(describe(404), /no page at that address/);
+  assert.match(describe(500), /server error/);
+  assert.match(describe(429), /rate-limiting/);
+  // A 404 is not fixed by a different browser, so it must not suggest one.
+  assert.doesNotMatch(describe(404), /your own browser/);
 });
 
 /* ------------------------------------------------------------------ */

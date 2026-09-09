@@ -12,6 +12,15 @@ const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascrip
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+
+    // Reproduces a site that refuses the request outright, which renders an
+    // error page that extraction would otherwise measure as the design.
+    if (url.pathname === '/403') {
+      res.writeHead(403, { 'content-type': 'text/html' });
+      res.end('<!doctype html><title>403 Forbidden</title><h1>403 Forbidden</h1><p>Access denied.</p>');
+      return;
+    }
+
     const rel = normalize(url.pathname).replace(/^(\.\.[/\\])+/, '');
     const path = join(ROOT, rel === '/' ? 'marketing.html' : rel);
     const body = await readFile(path);

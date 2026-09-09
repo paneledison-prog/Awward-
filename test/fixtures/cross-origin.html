@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Cross-origin stylesheet fixture</title>
+<!-- Different port, so this is cross-origin and unreadable via the CSSOM. -->
+<link rel="stylesheet" href="http://127.0.0.1:4322/external.css">
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; color: #16202b; background: #fff; }
+  h1 { font-size: 44px; margin: 56px 0 12px; }
+  h3 { font-size: 19px; margin: 0 0 8px; }
+  p  { color: #5b6875; font-size: 15px; margin: 0; }
+</style></head>
+<body>
+  <div class="wrap">
+    <h1>Breakpoints live in the other file</h1>
+    <p>Only the inline styles here are readable from inside the page.</p>
+    <div class="grid" style="margin-top:40px">
+      <div class="card"><h3>Alpha</h3><p>First card with enough copy to register as body text.</p></div>
+      <div class="card"><h3>Beta</h3><p>Second card with enough copy to register as body text.</p></div>
+      <div class="card"><h3>Gamma</h3><p>Third card with enough copy to register as body text.</p></div>
+      <div class="card"><h3>Delta</h3><p>Fourth card with enough copy to register as body text.</p></div>
+    </div>
+  </div>
+</body></html>

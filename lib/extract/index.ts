@@ -1,4 +1,4 @@
-import { VIEWPORTS, loadAndSettle, openPage, screenshot } from '../browser';
+import { VIEWPORTS, describeHttpFailure, loadAndSettle, openPage, screenshot } from '../browser';
 import { screenshotName, screenshotUrl, writeScreenshot } from '../screenshots';
 import { checkRobots } from '../resolve';
 import { emitAgentPrompt, emitCompactPrompt } from '../emit/prompt';
@@ -39,6 +39,7 @@ import {
 import { harvest } from './harvest';
 import { buildSections } from './sections';
 import { buildSpacingScale } from './spacing';
+import { recoverMediaQueries } from './stylesheets';
 import { NodeTree } from './tree';
 import { buildFontFamilies, buildTypeScale, headingSizesFrom } from './typography';
 
@@ -64,7 +65,10 @@ async function capture(
   const viewport = VIEWPORTS[label];
   const session = await openPage(viewport, colorScheme);
   try {
-    await loadAndSettle(session.page, url, TIMEOUT_MS);
+    const { status } = await loadAndSettle(session.page, url, TIMEOUT_MS);
+    const failure = describeHttpFailure(status, url);
+    if (failure) throw new Error(failure);
+
     const result = await harvest(session.page, url, viewport);
 
     let screenshotPath: string | undefined;
@@ -217,11 +221,6 @@ export async function runExtraction(
       `The page exceeded the ${primary.harvest.nodes.length}-element analysis cap; very deep subtrees were skipped.`,
     );
   }
-  if (primary.harvest.stats.inaccessibleSheets > 0) {
-    warnings.push(
-      `${primary.harvest.stats.inaccessibleSheets} cross-origin stylesheet(s) could not be read directly. Their rendered effect is still captured, but media queries declared only in them are missing.`,
-    );
-  }
 
   if (primary.screenshotError) {
     warnings.push(`Screenshot at ${primaryLabel} failed: ${primary.screenshotError}`);
@@ -311,6 +310,26 @@ export async function analyze(input: AnalysisInput): Promise<ExtractionResult> {
   const challenge = detectChallenge(primary);
   if (challenge) {
     throw new Error(challengeMessage(challenge, primary.finalUrl, input.source ?? 'server'));
+  }
+
+  // Breakpoints declared only in a cross-origin stylesheet are invisible to the
+  // page but not to the server, which is not bound by the same-origin policy.
+  if (primary.stats.inaccessibleSheets > 0) {
+    onProgress('design', 'Reading stylesheets the page could not…', 58);
+    const recovered = await recoverMediaQueries(network, primary.finalUrl);
+    if (recovered.queries.length > 0) {
+      primary.mediaQueries = [...new Set([...primary.mediaQueries, ...recovered.queries])];
+      warnings.push(
+        `${primary.stats.inaccessibleSheets} cross-origin stylesheet(s) were unreadable from the page; ` +
+          `${recovered.queries.length} media queries were recovered by fetching them directly.`,
+      );
+    } else {
+      warnings.push(
+        `${primary.stats.inaccessibleSheets} cross-origin stylesheet(s) could not be read from the page ` +
+          `or fetched directly. Their rendered effect is still captured, but breakpoints declared only ` +
+          `inside them are missing.`,
+      );
+    }
   }
 
   onProgress('design', 'Inferring the design system…', 62);

@@ -121,8 +121,16 @@ export async function openPage(
  * has actually been scrolled, so a plain `goto` captures a half-built page and
  * every downstream inference inherits the gap.
  */
-export async function loadAndSettle(page: Page, url: string, timeoutMs: number): Promise<void> {
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+export async function loadAndSettle(
+  page: Page,
+  url: string,
+  timeoutMs: number,
+): Promise<{ status: number }> {
+  const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+  // A refused request still renders: the server's error page has a background,
+  // a font and a heading, so extraction "succeeds" and reports the design
+  // system of a 403. The status is the only thing that distinguishes them.
+  const status = response?.status() ?? 0;
 
   // networkidle can never arrive on sites with polling or open sockets, so it
   // is a best-effort improvement rather than a requirement.
@@ -144,6 +152,29 @@ export async function loadAndSettle(page: Page, url: string, timeoutMs: number):
   // Let fonts swap in before styles are read; a FOUT would poison the type scale.
   await page.evaluate(() => document.fonts?.ready).catch(() => undefined);
   await page.waitForTimeout(400);
+
+  return { status };
+}
+
+/** Human-readable reason a status code means there is nothing to extract. */
+export function describeHttpFailure(status: number, url: string): string | null {
+  if (status < 400) return null;
+
+  const reasons: Record<number, string> = {
+    401: 'requires sign-in',
+    403: 'refused the request',
+    404: 'has no page at that address',
+    429: 'is rate-limiting requests',
+    451: 'is blocked for legal reasons',
+  };
+  const reason = reasons[status] ?? (status >= 500 ? 'returned a server error' : 'refused the request');
+
+  const advice =
+    status === 403 || status === 401 || status === 429
+      ? ' The page may load normally in your own browser — use "Run it in your own browser" to measure it there.'
+      : '';
+
+  return `${url} ${reason} (HTTP ${status}). There is nothing to extract: any design system reported would describe the error page.${advice}`;
 }
 
 /**
