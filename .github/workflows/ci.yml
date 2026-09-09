@@ -34,6 +34,19 @@ jobs:
           cache: npm
 
       - run: npm ci --no-audit --no-fund
+
+      - name: fly.toml PORT matches internal_port
+        # A mismatch deploys "successfully" and then fails every health check
+        # with no useful error. Cheap to check, expensive to debug live.
+        run: |
+          port=$(grep -E '^\s*PORT\s*=' fly.toml | head -1 | tr -d "\"' " | cut -d= -f2)
+          internal=$(grep -E '^\s*internal_port\s*=' fly.toml | head -1 | tr -d "\"' " | cut -d= -f2)
+          echo "PORT=$port internal_port=$internal"
+          if [ "$port" != "$internal" ]; then
+            echo "::error file=fly.toml::PORT ($port) does not match internal_port ($internal) — Fly would route to a port nothing listens on."
+            exit 1
+          fi
+
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

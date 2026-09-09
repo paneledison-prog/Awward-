@@ -3,19 +3,25 @@
 # Two values here need changing at launch:
 #   app            — must be globally unique; `fly launch` will prompt and rewrite it
 #   primary_region — set to whichever region is near you (`fly platform regions`)
-app = "designdna"
-primary_region = "iad"
+app = "awward-stoe"
+primary_region = "ams"
 
 [build]
   dockerfile = "Dockerfile"
 
 [env]
-  PORT = "3000"
+  # MUST match http_service.internal_port below. The app listens on $PORT;
+  # Fly routes external traffic to internal_port. If they disagree nothing is
+  # listening where Fly is knocking, the deploy reports success, and every
+  # health check fails with a bare "Request failed" — which is exactly what
+  # `fly launch` produced when its scanner rewrote internal_port to 8080 and
+  # left PORT at 3000. CI now asserts these two agree.
+  PORT = "8080"
   EXTRACT_TIMEOUT_MS = "60000"
   SCREENSHOT_DIR = "/app/.screenshots"
 
 [http_service]
-  internal_port = 3000
+  internal_port = 8080
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
