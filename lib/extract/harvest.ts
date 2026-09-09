@@ -3,14 +3,16 @@ import type { HarvestResult, ViewportConfig } from '../types';
 
 /**
  * Everything below `inPageHarvest` runs inside the browser, serialized across
- * the CDP bridge. It cannot close over anything from this module, which is why
+ * the CDP bridge — or, for pages this server cannot render, pasted into the
+ * visitor's own console or run by the extension. It is exported so all three
+ * paths run byte-identical code rather than a copy that can drift. It cannot close over anything from this module, which is why
  * the constants and helpers are declared inside it.
  *
  * The output is one flat array of nodes. Every inference downstream is a pure
  * function over that array, so the expensive part (rendering) happens once and
  * the analysis stays unit-testable without a browser.
  */
-function inPageHarvest(maxNodes: number) {
+export function inPageHarvest(maxNodes: number) {
   /* ---------------------------------------------------------------- */
   /* Setup                                                             */
   /* ---------------------------------------------------------------- */

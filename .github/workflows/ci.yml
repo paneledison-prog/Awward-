@@ -47,6 +47,18 @@ jobs:
             exit 1
           fi
 
+      - name: Extension harvest is in sync with source
+        # extension/harvest.js is generated from lib/extract/harvest.ts. If the
+        # two drift, the extension silently measures a page differently from the
+        # server and nothing else would notice.
+        run: |
+          npm run build:extension
+          if ! git diff --quiet -- extension/harvest.js; then
+            echo "::error file=extension/harvest.js::Out of date. Run 'npm run build:extension' and commit the result."
+            git diff --stat -- extension/harvest.js
+            exit 1
+          fi
+
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

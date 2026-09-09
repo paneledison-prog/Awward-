@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DesignDNA</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    width: 340px; margin: 0; padding: 16px;
+    background: #0d0f14; color: #e6e9ef;
+    font: 13px/1.5 ui-sans-serif, system-ui, sans-serif;
+  }
+  h1 { margin: 0 0 2px; font-size: 15px; font-weight: 600; }
+  .sub { margin: 0 0 14px; font-size: 11px; color: #67707f;
+         font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .url { margin-bottom: 14px; padding: 8px 10px; border-radius: 6px;
+         background: #12151c; border: 1px solid #1e2430;
+         font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+         color: #9aa4b5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  label { display: block; margin-bottom: 5px; font-size: 11px; color: #67707f; }
+  input, select {
+    width: 100%; box-sizing: border-box; margin-bottom: 12px; padding: 7px 9px;
+    border-radius: 6px; border: 1px solid #1e2430; background: #12151c; color: #e6e9ef;
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+  }
+  button {
+    width: 100%; padding: 10px; border: 0; border-radius: 6px;
+    background: #6ee7b7; color: #06070a; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { margin-top: 12px; font-size: 11px; line-height: 1.5;
+            font-family: ui-monospace, Menlo, monospace; color: #9aa4b5; min-height: 32px; }
+  #status.err { color: #fb7185; }
+  #status.ok { color: #6ee7b7; }
+</style>
+
+<h1>DesignDNA</h1>
+<p class="sub">measure this page → build-ready code</p>
+
+<div class="url" id="pageUrl">…</div>
+
+<label for="instance">DesignDNA instance</label>
+<input id="instance" type="url" placeholder="https://your-app.fly.dev" spellcheck="false">
+
+<label for="shot">Screenshot</label>
+<select id="shot">
+  <option value="full">Full page (scroll and stitch)</option>
+  <option value="viewport">Visible area only</option>
+  <option value="none">None (fastest)</option>
+</select>
+
+<button id="go">Extract this page</button>
+<div id="status"></div>
+
+<script src="popup.js"></script>

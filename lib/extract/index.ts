@@ -255,13 +255,6 @@ export async function runExtraction(
     warnings.push('Dark-mode capture failed; only the light palette was extracted.');
   }
 
-  onProgress('design', 'Inferring the design system…', 62);
-  const design = buildDesignSystem(primary.harvest, primary.network, darkHarvest);
-
-  onProgress('sections', 'Segmenting sections and detecting components…', 74);
-  const sections = buildSections(primary.harvest);
-  mergeResponsive(sections, others);
-
   const screenshots: AssetManifest['screenshots'] = {};
   if (primary.screenshotPath) screenshots[primaryLabel] = primary.screenshotPath;
   for (const label of viewports.filter((v) => v !== primaryLabel)) {
@@ -271,17 +264,69 @@ export async function runExtraction(
     if (shot && !shot.failed) screenshots[label] = screenshotUrl(screenshotName(jobId, label));
   }
 
+  return analyze({
+    jobId,
+    requestedUrl: options.url,
+    primary: primary.harvest,
+    others,
+    dark: darkHarvest,
+    network: primary.network,
+    screenshots,
+    contentMode: options.contentMode,
+    emitReact: options.emitReact,
+    emitHtml: options.emitHtml,
+    warnings,
+    startedAt,
+    onProgress,
+  });
+}
+
+export interface AnalysisInput {
+  jobId: string;
+  requestedUrl: string;
+  primary: HarvestResult;
+  others: { label: ViewportLabel; harvest: HarvestResult }[];
+  dark?: HarvestResult;
+  network: HarvestNetworkEntry[];
+  screenshots: AssetManifest['screenshots'];
+  contentMode: ExtractOptions['contentMode'];
+  emitReact: boolean;
+  emitHtml: boolean;
+  warnings: string[];
+  startedAt: number;
+  onProgress: ProgressFn;
+}
+
+/**
+ * Everything after rendering: inference, structure, and emitted output.
+ *
+ * Split out from `runExtraction` because the harvest does not have to come from
+ * this server's browser. A page behind bot protection will never render here,
+ * but it renders perfectly well in the browser of someone who can already view
+ * it — so the same harvest can arrive from a console snippet or the extension
+ * and take exactly this path, producing identical output.
+ */
+export async function analyze(input: AnalysisInput): Promise<ExtractionResult> {
+  const { jobId, primary, others, dark, network, warnings, onProgress } = input;
+
+  onProgress('design', 'Inferring the design system…', 62);
+  const design = buildDesignSystem(primary, network, dark);
+
+  onProgress('sections', 'Segmenting sections and detecting components…', 74);
+  const sections = buildSections(primary);
+  mergeResponsive(sections, others);
+
   onProgress('assets', 'Cataloguing fonts, icons and images…', 82);
-  const assets = buildAssetManifest(primary.harvest, design.families, screenshots);
+  const assets = buildAssetManifest(primary, design.families, input.screenshots);
 
   const page: PageMeta = {
-    requestedUrl: options.url,
-    finalUrl: primary.harvest.finalUrl,
-    title: primary.harvest.title,
-    description: primary.harvest.description,
-    lang: primary.harvest.lang,
-    themeColor: primary.harvest.meta.themeColor,
-    documentHeight: primary.harvest.documentHeight,
+    requestedUrl: input.requestedUrl,
+    finalUrl: primary.finalUrl,
+    title: primary.title,
+    description: primary.description,
+    lang: primary.lang,
+    themeColor: primary.meta.themeColor,
+    documentHeight: primary.documentHeight,
     extractedAt: new Date().toISOString(),
     durationMs: 0,
     warnings,
@@ -289,8 +334,8 @@ export async function runExtraction(
 
   onProgress('emit', 'Generating tokens, components and the agent brief…', 90);
 
-  const prompt = emitAgentPrompt(page, design, sections, assets, options.contentMode);
-  const compact = emitCompactPrompt(page, design, sections, options.contentMode);
+  const prompt = emitAgentPrompt(page, design, sections, assets, input.contentMode);
+  const compact = emitCompactPrompt(page, design, sections, input.contentMode);
 
   const files: EmittedFile[] = [
     prompt,
@@ -301,9 +346,9 @@ export async function runExtraction(
     emitTailwindTheme(design),
   ];
 
-  if (options.emitReact) files.push(...emitReactSections(design, sections, options.contentMode));
-  if (options.emitHtml) {
-    files.push(...emitHtml(design, sections, options.contentMode, page.title, page.description));
+  if (input.emitReact) files.push(...emitReactSections(design, sections, input.contentMode));
+  if (input.emitHtml) {
+    files.push(...emitHtml(design, sections, input.contentMode, page.title, page.description));
   }
 
   files.push({
@@ -313,7 +358,7 @@ export async function runExtraction(
     description: 'The complete extraction as machine-readable JSON.',
   });
 
-  page.durationMs = Date.now() - startedAt;
+  page.durationMs = Date.now() - input.startedAt;
 
   // The completion event is emitted by the job store when this resolves;
   // announcing it here too would deliver "done" twice to every SSE client.
@@ -327,11 +372,11 @@ export async function runExtraction(
     agentPrompt: prompt.contents,
     agentPromptCompact: compact.contents,
     stats: {
-      nodesAnalyzed: primary.harvest.nodes.length,
+      nodesAnalyzed: primary.nodes.length,
       colorsFound: design.palette.tokens.length,
       sectionsFound: sections.length,
       componentsDetected: sections.filter((s) => s.repeat).length,
-      inaccessibleSheets: primary.harvest.stats.inaccessibleSheets,
+      inaccessibleSheets: primary.stats.inaccessibleSheets,
     },
   };
 }

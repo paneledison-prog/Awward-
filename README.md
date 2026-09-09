@@ -231,15 +231,38 @@ Redis or Postgres — which is not implemented.
 
 Some sites sit behind bot protection — Cloudflare, DataDome, PerimeterX — and
 serve a "verify you are human" interstitial instead of the page. DesignDNA
-detects this and fails with a clear message naming the vendor, rather than
-extracting the challenge page and reporting its colours as the site's design
-system.
+detects this and fails with a message naming the vendor, rather than extracting
+the challenge page and reporting its colours as the site's design system.
 
-This is not worked around, and there is no setting to bypass it. The
-interstitial is the site stating it does not want automated access; the tool
-honours that the same way it honours `robots.txt`. Most sites do not do this,
-and those that do usually serve their marketing pages freely even when the app
-itself is protected.
+Nothing here defeats that check, and there is no setting to bypass it. The
+interstitial is the site stating it does not want *automated* access, and that
+gets the same treatment as `robots.txt`.
+
+But you are not automated. If you can open the page in your own browser, the
+same measurement can run there instead — the block is about where the browser
+runs, not what it measures.
+
+### Run it in your own browser
+
+Two ways, both taking the identical code path once the harvest arrives:
+
+**Console snippet** — copy it from the app's front page (or `GET /api/harvest-script`),
+paste into DevTools on the page you want, press Enter. It measures the page,
+posts the result back, and opens the results tab. No screenshots, and only the
+viewport you have open.
+
+**Browser extension** (`extension/`) — click the toolbar button. Same harvest,
+plus a screenshot: the visible area, or a full-page capture assembled by
+scrolling and compositing, since Chrome gives extensions no full-page API.
+
+Load it unpacked: `chrome://extensions` → Developer mode → Load unpacked →
+select `extension/`. Set your instance URL in the popup on first use. It asks
+for host permission only for that instance, and uses `activeTab` for the page —
+granted per click, not standing access to your browsing.
+
+`extension/harvest.js` is generated from `lib/extract/harvest.ts` by
+`npm run build:extension`, so the extension and the server cannot drift apart.
+CI fails if the committed copy is stale.
 
 ## Known limits
 

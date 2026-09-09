@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SearchPanel, type ExtractRequest } from '@/components/SearchPanel';
+import { BrowserHarvest } from '@/components/BrowserHarvest';
 import { ProgressPanel } from '@/components/ProgressPanel';
 import { OverviewTab } from '@/components/OverviewTab';
 import { SectionsTab } from '@/components/SectionsTab';
@@ -27,6 +28,48 @@ export default function Home() {
   const [result, setResult] = useState<ExtractionResult | null>(null);
   const [tab, setTab] = useState<Tab>('prompt');
   const sourceRef = useRef<EventSource | null>(null);
+
+  // A harvest run in the visitor's own browser posts to /api/import and opens
+  // ?job=<id> here, so the result has to be loadable without having started it.
+  useEffect(() => {
+    const jobId = new URLSearchParams(window.location.search).get('job');
+    if (!jobId) return;
+
+    let cancelled = false;
+    setBusy(true);
+    (async () => {
+      try {
+        // The import is analysed server-side and usually lands within a second
+        // or two, so poll briefly rather than opening a stream for it.
+        for (let attempt = 0; attempt < 60 && !cancelled; attempt++) {
+          const res = await fetch(`/api/extract/${jobId}`);
+          const data = await res.json();
+          if (!res.ok) {
+            setError(data.error ?? 'That extraction could not be loaded.');
+            break;
+          }
+          if (data.status === 'done') {
+            setResult(data.result as ExtractionResult);
+            setTab('prompt');
+            break;
+          }
+          if (data.status === 'error') {
+            setError(data.error ?? 'Extraction failed.');
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      } catch {
+        setError('Could not load that extraction.');
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const extract = useCallback(async (request: ExtractRequest) => {
     sourceRef.current?.close();
@@ -104,6 +147,10 @@ export default function Home() {
           </p>
 
           <SearchPanel busy={busy} onExtract={extract} />
+
+          <div className="mt-5">
+            <BrowserHarvest />
+          </div>
         </div>
       </div>
 
