@@ -59,6 +59,12 @@ export function BrowserHarvest() {
             </li>
             <li>
               <span className="mr-2 font-mono text-xs text-accent">3</span>
+              Type <code className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-xs text-amber">allow pasting</code>{' '}
+              and press Enter. Chrome blocks pasting into the console until you do — once per
+              browser profile.
+            </li>
+            <li>
+              <span className="mr-2 font-mono text-xs text-accent">4</span>
               Paste the snippet and press Enter. Results open in a new tab.
             </li>
           </ol>
@@ -88,9 +94,11 @@ export function BrowserHarvest() {
           {error ? <p className="mt-3 text-xs text-rose">{error}</p> : null}
 
           <p className="mt-4 max-w-2xl text-xs leading-relaxed text-fg-faint">
-            Chrome may ask you to type <code className="font-mono text-fg-dim">allow pasting</code>{' '}
-            in the console first. Only the viewport you have open is measured, and screenshots
-            are not captured — the browser extension does both.
+            Chrome&rsquo;s paste warning is worth taking seriously in general — it exists because
+            people get talked into pasting code that steals their session. Read this snippet
+            before you run it; that is what the link above is for. Only the viewport you have
+            open is measured, and no screenshot is taken — the extension does both and needs
+            none of this.
           </p>
         </div>
       ) : null}
