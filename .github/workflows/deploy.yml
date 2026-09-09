@@ -94,7 +94,15 @@ jobs:
 
       - name: Logs on failure
         if: failure()
-        run: flyctl logs --app "${{ inputs.app }}" --no-tail || true
+        # Guarded because the earliest failure — a missing token — happens before
+        # flyctl is installed, and "command not found" in the failure handler
+        # buries the actual error.
+        run: |
+          if command -v flyctl >/dev/null; then
+            flyctl logs --app "${{ inputs.app }}" --no-tail || true
+          else
+            echo "flyctl was not installed yet — the failure happened before deploy started."
+          fi
 
       - name: Summary
         if: success()
