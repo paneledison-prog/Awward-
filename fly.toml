@@ -1,0 +1,31 @@
+# Fly.io. Deploy with:  fly launch --copy-config --now
+app = "designdna"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  EXTRACT_TIMEOUT_MS = "60000"
+  SCREENSHOT_DIR = "/app/.screenshots"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Extraction holds a browser open for up to a minute; scaling to zero between
+  # runs is fine, but a request must never land on a machine mid-shutdown.
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    # One Chromium render at a time per machine keeps memory predictable.
+    hard_limit = 4
+    soft_limit = 2
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # Chromium rendering a real page needs headroom; 512MB gets OOM-killed.
+  memory = "1gb"

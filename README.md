@@ -66,6 +66,29 @@ docker compose up --build
 # http://localhost:3000
 ```
 
+### Deploy
+
+The app needs a container that can run Chromium: **at least 1GB of memory**, and a
+platform that allows a long-running process. It will not run on standard
+serverless — a request that holds a browser open for 40 seconds is the opposite
+of what those are for.
+
+Config is committed for three platforms; each reads the same `Dockerfile`.
+
+| Platform | Command | Notes |
+|---|---|---|
+| **Fly.io** | `fly launch --copy-config --now` | `fly.toml` sets 1GB and scale-to-zero. Cheapest for bursty use. |
+| **Railway** | New Project → Deploy from GitHub repo | Reads `railway.json`. Simplest UI; injects `PORT` itself. |
+| **Render** | New → Blueprint → select this repo | Reads `render.yaml`. Needs the Standard plan — free and Starter cap at 512MB and Chromium is OOM-killed. |
+
+After deploying, open the URL and extract something. First request is slow if the
+platform scales to zero.
+
+> These files are written but unverified: they were authored in an environment
+> with no Docker daemon and no network access to any hosting provider, so the
+> image has never been built. Expect to adjust the plan or region; the app
+> itself is verified working under `next start`.
+
 ### Local
 
 Requires Node 22+.
@@ -75,6 +98,18 @@ npm install
 npx playwright install chromium   # only if Playwright has no browser yet
 npm run dev
 ```
+
+To open it from a phone on the same network, bind to every interface:
+
+```bash
+npm run build && npm run start:lan   # then http://<your-lan-ip>:3000
+```
+
+`npm run dev` and `npm start` listen on localhost only, so a phone cannot reach
+them. If your browser enforces HTTPS-Only it will refuse a plain `http://` LAN
+address; either turn that off or put a tunnel in front
+(`cloudflared tunnel --url http://localhost:3000`), which also works over
+cellular.
 
 ### Configuration
 
@@ -87,6 +122,7 @@ All optional — see `.env.example`.
 | `JOB_TTL_MS` | `1800000` | How long finished results stay in memory. |
 | `SCREENSHOT_DIR` | `.screenshots` | Where full-page renders are written. Must be outside `public/`. |
 | `CHROMIUM_EXECUTABLE_PATH` | — | Explicit Chromium path, when Playwright's own copy is not the one you want. |
+| `HOSTNAME` / `-H` | `localhost` | `npm run start:lan` binds `0.0.0.0` so other devices on the network can connect. |
 | `HTTPS_PROXY` | — | Routes the browser through a proxy. |
 | `DEV_INSECURE_TLS` | — | **Development only.** Accepts a dev proxy's MITM certificate. Never set in production. |
 

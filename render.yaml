@@ -1,0 +1,17 @@
+# Render Blueprint. In the dashboard: New → Blueprint → point at this repo.
+services:
+  - type: web
+    name: designdna
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # Chromium needs more than the 512MB on Render's free and starter plans;
+    # on a smaller instance the browser is OOM-killed mid-render.
+    plan: standard
+    healthCheckPath: /
+    envVars:
+      - key: EXTRACT_TIMEOUT_MS
+        value: "60000"
+      - key: JOB_TTL_MS
+        value: "1800000"
+      - key: SCREENSHOT_DIR
+        value: /app/.screenshots

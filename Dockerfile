@@ -9,6 +9,15 @@ COPY package.json package-lock.json ./
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm ci --no-audit --no-fund
 
+# Build needs devDependencies (TypeScript, Tailwind); the runtime does not, so
+# production dependencies are resolved separately rather than shipping ~200MB of
+# build tooling in the final image.
+FROM mcr.microsoft.com/playwright:v1.55.1-noble AS proddeps
+WORKDIR /app
+COPY package.json package-lock.json ./
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+RUN npm ci --omit=dev --no-audit --no-fund
+
 FROM mcr.microsoft.com/playwright:v1.55.1-noble AS build
 WORKDIR /app
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 NEXT_TELEMETRY_DISABLED=1
@@ -23,9 +32,9 @@ ENV NODE_ENV=production \
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     PORT=3000
 
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=proddeps /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
-COPY package.json next.config.ts ./
+COPY package.json next.config.mjs ./
 
 # Screenshots are written at runtime, so they cannot live under public/ — Next
 # serves that from a manifest fixed at build time. pwuser must own the directory
@@ -38,4 +47,7 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["npm", "run", "start"]
+# start:lan binds 0.0.0.0. `next start` reachable only on loopback inside the
+# container would fail every platform health check, and the deploy would be
+# marked unhealthy with the app itself running fine.
+CMD ["npm", "run", "start:lan"]
