@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian — The issue tracker that keeps up</title>
+<meta name="description" content="Meridian is a fast, keyboard-first issue tracker for product teams.">
+<style>
+  :root{
+    --bg:#0b0d12; --surface:#151922; --fg:#f2f4f8; --muted:#8b93a3;
+    --brand:#7c5cff; --brand-2:#22d3ee; --line:#232936; --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-size:16px;line-height:1.55;
+       font-family:'Geist',ui-sans-serif,system-ui,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 32px}
+  a{color:inherit;text-decoration:none}
+  header{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,13,18,.85)}
+  header .wrap{display:flex;justify-content:space-between;align-items:center;height:60px;gap:40px}
+  .brand{font-size:18px;font-weight:600;letter-spacing:-.02em}
+  .menu{display:flex;gap:28px}
+  .menu a{font-size:14px;color:var(--muted)}
+  .cta{background:var(--brand);color:#fff;padding:8px 16px;border-radius:8px;font-size:14px;font-weight:500}
+  .hero{padding:120px 0 80px;text-align:center}
+  h1{font-size:56px;line-height:1.05;letter-spacing:-.035em;font-weight:600;margin-bottom:20px}
+  .hero p{font-size:19px;color:var(--muted);max-width:600px;margin:0 auto 32px}
+  .row{display:flex;gap:12px;justify-content:center}
+  .ghost{border:1px solid var(--line);padding:8px 16px;border-radius:8px;font-size:14px;color:var(--fg)}
+  .stats{padding:64px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center}
+  .stat .n{font-size:36px;font-weight:600;letter-spacing:-.02em;color:var(--brand-2)}
+  .stat .l{font-size:14px;color:var(--muted);margin-top:4px}
+  .feat{padding:96px 0}
+  h2{font-size:34px;letter-spacing:-.025em;font-weight:600;text-align:center;margin-bottom:12px}
+  .sub{color:var(--muted);text-align:center;max-width:520px;margin:0 auto 56px;font-size:17px}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:24px}
+  .card h3{font-size:17px;font-weight:600;margin-bottom:8px}
+  .card p{font-size:14px;color:var(--muted)}
+  .faq{padding:96px 0;background:var(--surface)}
+  details{border-bottom:1px solid var(--line);padding:20px 0}
+  summary{font-size:17px;font-weight:500;cursor:pointer}
+  details p{color:var(--muted);font-size:15px;margin-top:12px}
+  footer{padding:48px 0;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+  footer .wrap{display:flex;justify-content:space-between;gap:32px;flex-wrap:wrap}
+  @media(max-width:900px){ .cards,.stat-grid{grid-template-columns:repeat(2,1fr)} }
+  @media(max-width:640px){ h1{font-size:36px} .cards,.stat-grid{grid-template-columns:1fr} .menu{display:none} }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <a class="brand" href="/">Meridian</a>
+  <nav class="menu"><a href="/features">Features</a><a href="/changelog">Changelog</a><a href="/docs">Docs</a><a href="/pricing">Pricing</a></nav>
+  <a class="cta" href="/start">Get started</a>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <h1>The issue tracker that keeps up with you</h1>
+  <p>Meridian is built for teams who move fast. Keyboard-first, offline-capable, and quick enough that you never lose your train of thought.</p>
+  <div class="row"><a class="cta" href="/start">Start free</a><a class="ghost" href="/demo">Watch demo</a></div>
+</div></section>
+
+<section class="stats"><div class="wrap"><div class="stat-grid">
+  <div class="stat"><div class="n">14ms</div><div class="l">Median interaction</div></div>
+  <div class="stat"><div class="n">99.99%</div><div class="l">Uptime last year</div></div>
+  <div class="stat"><div class="n">2.4M</div><div class="l">Issues tracked</div></div>
+  <div class="stat"><div class="n">40k+</div><div class="l">Teams onboard</div></div>
+</div></div></section>
+
+<section class="feat"><div class="wrap">
+  <h2>Built for momentum</h2>
+  <p class="sub">Every interaction is optimistic, every view is instant, and nothing blocks on the network.</p>
+  <div class="cards">
+    <div class="card"><h3>Instant search</h3><p>Full-text across issues, comments and documents in under fifteen milliseconds.</p></div>
+    <div class="card"><h3>Offline first</h3><p>Keep working on a plane. Changes sync and merge cleanly the moment you reconnect.</p></div>
+    <div class="card"><h3>Keyboard native</h3><p>Every action has a shortcut, and the command palette reaches all of them.</p></div>
+    <div class="card"><h3>Real-time sync</h3><p>See teammates' cursors and edits stream in without a single page refresh.</p></div>
+    <div class="card"><h3>Automations</h3><p>Route, label and escalate with rules that run server-side in milliseconds.</p></div>
+    <div class="card"><h3>Deep integrations</h3><p>GitHub, Slack and Figma stay in sync bidirectionally, not on a five-minute poll.</p></div>
+  </div>
+</div></section>
+
+<section class="faq"><div class="wrap">
+  <h2>Questions</h2>
+  <p class="sub">The things teams ask us most before switching.</p>
+  <details open><summary>Can we import from our current tracker?</summary><p>Yes — Jira, Linear, GitHub Issues and CSV imports all preserve history, comments and attachments.</p></details>
+  <details><summary>Is there a self-hosted option?</summary><p>Enterprise plans can run Meridian in your own VPC with the same release cadence as our cloud.</p></details>
+  <details><summary>How does pricing work for contractors?</summary><p>Guest seats are free for anyone outside your organization who only comments on issues.</p></details>
+</div></section>
+
+<footer><div class="wrap">
+  <span>© 2026 Meridian Labs</span>
+  <span>Privacy · Terms · Security · Status</span>
+</div></footer>
+</body>
+</html>

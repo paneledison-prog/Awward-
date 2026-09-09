@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #06070a;
+  --color-panel: #0d0f14;
+  --color-panel-2: #12151c;
+  --color-line: #1e2430;
+  --color-line-bright: #2c3543;
+  --color-fg: #e6e9ef;
+  --color-fg-dim: #9aa4b5;
+  --color-fg-faint: #67707f;
+  --color-accent: #6ee7b7;
+  --color-accent-dim: #34d399;
+  --color-violet: #a78bfa;
+  --color-amber: #fbbf24;
+  --color-rose: #fb7185;
+
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * A quiet grid behind the header, so the page reads as a tool rather than a form.
+ *
+ * The fade lives on a pseudo-element rather than the container: a mask applied
+ * to the container clips its children too, which fades out the intro copy and
+ * hides the search field.
+ */
+.grid-backdrop {
+  position: relative;
+  isolation: isolate;
+}
+
+.grid-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(110, 231, 183, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(110, 231, 183, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 35%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 35%, transparent 100%);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-ink);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Scrollbars inside code panes, kept unobtrusive but visible. */
+.scroll-thin::-webkit-scrollbar { width: 10px; height: 10px; }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--color-line-bright);
+  border-radius: 6px;
+  border: 2px solid var(--color-panel);
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: #3d4859; }
+
+@keyframes pulse-bar {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.animate-pulse-bar { animation: pulse-bar 1.4s ease-in-out infinite; }

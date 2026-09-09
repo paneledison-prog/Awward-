@@ -1,0 +1,13 @@
+services:
+  designdna:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # Rendering three viewports plus a dark-mode pass; raise on slow targets.
+      EXTRACT_TIMEOUT_MS: "60000"
+      JOB_TTL_MS: "1800000"
+    # Chromium's shared-memory default (64MB) is too small for real pages and
+    # makes tabs crash under load; giving it 1GB is the standard fix.
+    shm_size: "1gb"
+    restart: unless-stopped

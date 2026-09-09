@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Notes on distributed consensus</title>
+<style>
+  body{font-family:Georgia,'Times New Roman',serif;max-width:44em;margin:2em auto;padding:0 1em;
+       color:#111;background:#fff;line-height:1.55;font-size:17px}
+  h1{font-size:26px;margin-bottom:.2em}
+  h2{font-size:20px;margin-top:1.6em}
+  .meta{color:#666;font-size:14px;margin-bottom:2em}
+  pre{background:#f5f5f5;padding:12px;overflow-x:auto;font-size:14px}
+  a{color:#0645ad}
+  ul{padding-left:1.4em}
+</style>
+</head>
+<body>
+<h1>Notes on distributed consensus</h1>
+<p class="meta">Posted 4 March 2026 · 11 min read</p>
+
+<p>Consensus protocols are usually introduced through their safety properties, which is a mistake. Safety is the easy half. What actually determines whether a protocol survives contact with a real network is how it behaves when liveness is threatened — during partitions, clock skew, and the long tail of partial failures that no formal model bothers to enumerate.</p>
+
+<h2>Why quorums are not the interesting part</h2>
+<p>Every textbook treatment spends its first chapter on quorum intersection. The arithmetic is genuinely simple: any two majorities of an odd-sized set must share a member, and that shared member is enough to carry a decision forward. Once you have internalised that, quorums stop being interesting.</p>
+<p>What remains interesting is the leader. Almost every practical protocol funnels decisions through one, because doing otherwise costs a round trip, and the difference between one round trip and two is the difference between a system people enjoy using and one they route around.</p>
+
+<h2>Failure detectors in practice</h2>
+<p>A failure detector is a timeout with better marketing. The literature treats detection as an abstract oracle; production systems treat it as a tuning parameter that someone set during an incident three years ago and nobody has dared touch since.</p>
+<pre>if now() - last_heartbeat &gt; election_timeout {
+    become_candidate()
+}</pre>
+<p>The consequence is that the election timeout becomes the single most load-bearing constant in the system. Set it too low and a garbage-collection pause triggers a spurious election. Set it too high and a genuinely dead leader stalls writes for seconds.</p>
+
+<h2>What I would tell a past version of myself</h2>
+<ul>
+  <li>Measure the tail, not the median. The median is never where consensus systems fail.</li>
+  <li>Log every state transition with a monotonic term number; you will need it at 3am.</li>
+  <li>Treat clock skew as adversarial even inside a single datacenter.</li>
+  <li>Write the partition test before you write the happy path.</li>
+</ul>
+
+<p>Further reading: <a href="/raft">the Raft paper</a>, and the <a href="/jepsen">Jepsen analyses</a>, which remain the only literature that consistently tests what the papers claim.</p>
+</body>
+</html>

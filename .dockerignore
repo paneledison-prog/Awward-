@@ -1,0 +1,10 @@
+node_modules
+.next
+.dev-build
+.git
+.env
+.env.local
+.screenshots
+
+*.md
+!README.md

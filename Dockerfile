@@ -1,0 +1,41 @@
+# The Playwright image ships Chromium plus the system libraries it needs, which
+# is the bulk of the work in containerising a browser-driven service. The tag
+# must track the playwright-core version in package.json: a mismatch leaves the
+# browser revision the library expects missing at runtime.
+FROM mcr.microsoft.com/playwright:v1.55.1-noble AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+# Browsers are already in the image; re-downloading them would double its size.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+RUN npm ci --no-audit --no-fund
+
+FROM mcr.microsoft.com/playwright:v1.55.1-noble AS build
+WORKDIR /app
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+FROM mcr.microsoft.com/playwright:v1.55.1-noble AS runtime
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    PORT=3000
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/.next ./.next
+COPY package.json next.config.ts ./
+
+# Screenshots are written at runtime, so they cannot live under public/ — Next
+# serves that from a manifest fixed at build time. pwuser must own the directory
+# it writes into.
+ENV SCREENSHOT_DIR=/app/.screenshots
+RUN mkdir -p /app/.screenshots && chown -R pwuser:pwuser /app
+USER pwuser
+
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+CMD ["npm", "run", "start"]
