@@ -7,9 +7,8 @@ const MAX_SEGMENTS = 24;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function progress(text) {
-  chrome.runtime.sendMessage({ type: 'progress', text }).catch(() => {});
-}
+/** Set for the duration of one extraction; reports to that popup only. */
+let progress = () => {};
 
 async function run(tabId, args, func) {
   const [entry] = await chrome.scripting.executeScript({
@@ -145,7 +144,8 @@ async function stitch(frames, metrics) {
   });
 }
 
-async function extract({ tabId, instance, shotMode }) {
+async function extract({ tabId, instance, shotMode, onProgress }) {
+  progress = onProgress ?? (() => {});
   progress('Measuring the page…');
   const { harvest, network } = await harvestPage(tabId);
 
@@ -178,24 +178,43 @@ async function extract({ tabId, instance, shotMode }) {
 // exercise this path without simulating a popup click.
 self.designdna = { extract, captureFullPage, captureViewport };
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== 'extract') return false;
+/**
+ * A long-lived port rather than sendMessage/sendResponse.
+ *
+ * An extraction runs for tens of seconds and a popup closes the moment it loses
+ * focus. A listener that returns `true` and answers that late logs "the message
+ * channel closed before a response was received" for every message in flight —
+ * noise that looks like a failure and buries the real error when there is one.
+ * A port reports its own disconnect, so work continues and nothing is posted
+ * into a channel that has gone.
+ */
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'designdna') return;
 
-  // The popup can close mid-extraction — a full-page capture takes tens of
-  // seconds — and responding to a closed channel throws. Guarding it keeps a
-  // real failure visible instead of buried under a channel error.
-  const respond = (payload) => {
+  let connected = true;
+  port.onDisconnect.addListener(() => {
+    connected = false;
+  });
+
+  const send = (message) => {
+    if (!connected) return;
     try {
-      sendResponse(payload);
+      port.postMessage(message);
     } catch {
-      /* popup went away; nothing to report to */
+      connected = false;
     }
   };
 
-  extract(message)
-    .then((url) => respond({ ok: true, url }))
-    .catch((error) => respond({ ok: false, error: String(error.message ?? error) }));
-
-  // Keeps the message channel open for the async work above.
-  return true;
+  port.onMessage.addListener(async (message) => {
+    if (message?.type !== 'extract') return;
+    try {
+      const url = await extract({
+        ...message,
+        onProgress: (text) => send({ type: 'progress', text }),
+      });
+      send({ type: 'done', url });
+    } catch (error) {
+      send({ type: 'error', error: String(error.message ?? error) });
+    }
+  });
 });

@@ -46,28 +46,30 @@ $('go').addEventListener('click', async () => {
   $('go').disabled = true;
   say('Measuring…');
 
-  try {
-    const result = await chrome.runtime.sendMessage({
-      type: 'extract',
-      tabId: tab.id,
-      instance,
-      shotMode,
-    });
+  // A port, not sendMessage: this runs for tens of seconds and the popup closes
+  // as soon as it loses focus. The port simply disconnects, and the worker
+  // carries on rather than logging a channel error for every progress update.
+  const port = chrome.runtime.connect({ name: 'designdna' });
 
-    if (!result?.ok) throw new Error(result?.error ?? 'Extraction failed');
+  port.onMessage.addListener(async (msg) => {
+    if (msg.type === 'progress') return say(msg.text);
 
-    say('Done — opening results.', 'ok');
-    await chrome.tabs.create({ url: result.url });
-    window.close();
-  } catch (error) {
-    say(String(error.message ?? error), 'err');
-  } finally {
+    if (msg.type === 'done') {
+      say('Done — opening results.', 'ok');
+      await chrome.tabs.create({ url: msg.url });
+      window.close();
+      return;
+    }
+
+    if (msg.type === 'error') {
+      say(msg.error, 'err');
+      $('go').disabled = false;
+    }
+  });
+
+  port.onDisconnect.addListener(() => {
     $('go').disabled = false;
-  }
-});
+  });
 
-// The worker reports progress as it scrolls and stitches, which otherwise looks
-// like a hang on a long page.
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg?.type === 'progress') say(msg.text);
+  port.postMessage({ type: 'extract', tabId: tab.id, instance, shotMode });
 });
