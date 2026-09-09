@@ -1,0 +1,59 @@
+name: Verify deployment
+
+# Checks a already-deployed instance over plain HTTP. Deliberately separate from
+# deploy.yml: it needs no Fly credentials, so it can be run by anyone, against
+# any environment, without the ability to change it.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Base URL of the deployed app'
+        required: true
+        default: 'https://awward-stoe.fly.dev'
+        type: string
+      target:
+        description: 'Site for the deployed instance to extract'
+        required: true
+        default: 'https://example.com'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Extract on the live instance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Reachability
+        # Reported before the smoke run so a routing failure is distinguishable
+        # from an extraction failure.
+        run: |
+          URL="${{ inputs.url }}"
+          echo "── HEAD $URL ──"
+          curl -sS -o /dev/null -D - --max-time 30 "$URL" || echo "(request failed)"
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$URL" || echo 000)
+          echo "status: $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::$URL returned $code — the app is not serving. If the deploy reported success, check that fly.toml's PORT matches internal_port."
+            exit 1
+          fi
+
+      - name: Extract a real site on it
+        run: node scripts/smoke-container.mjs "${{ inputs.url }}" "${{ inputs.target }}" --loose
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## ${{ inputs.url }}"
+            echo ""
+            echo "Extraction target: \`${{ inputs.target }}\`"
+            echo "Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
