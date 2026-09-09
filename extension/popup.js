@@ -92,7 +92,9 @@ function summarize(shotMode, instance) {
   }
 }
 
-$('version').textContent = `v${chrome.runtime.getManifest().version}`;
+for (const id of ['version', 'versionDone']) {
+  $(id).textContent = `v${chrome.runtime.getManifest().version}`;
+}
 
 (async () => {
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
