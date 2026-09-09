@@ -107,12 +107,22 @@ npm run dev
 To open it from a phone on the same network, bind to every interface:
 
 ```bash
-npm run build && npm run start:lan   # then http://<your-lan-ip>:3000
+npm run dev:lan                      # or: npm run build && npm run start:lan
+# then http://<your-lan-ip>:3000
 ```
 
 `npm run dev` and `npm start` listen on localhost only, so a phone cannot reach
-them. If your browser enforces HTTPS-Only it will refuse a plain `http://` LAN
-address; either turn that off or put a tunnel in front
+them.
+
+`dev:lan` works because `next.config.mjs` sets `allowedDevOrigins` for private
+network ranges. Without it, `next dev` treats any origin other than `localhost`
+as cross-origin and refuses the HMR WebSocket — and since Turbopack's module
+runtime rides on that socket, the page renders and then never hydrates. Every
+control is dead, with only a WebSocket error in the console to explain it. That
+failure is invisible in production, which does not use HMR at all.
+
+If your browser enforces HTTPS-Only it will refuse a plain `http://` LAN address;
+either turn that off or put a tunnel in front
 (`cloudflared tunnel --url http://localhost:3000`), which also works over
 cellular.
 
