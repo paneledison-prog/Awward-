@@ -69,6 +69,23 @@ jobs:
               exit 1 ;;
           esac
 
+      - name: Browser-harvest endpoint is served
+        # The console snippet is fetched from the deployed instance, so a
+        # deploy that serves the app but not this endpoint leaves the one path
+        # that works for blocked sites quietly broken.
+        run: |
+          URL="${{ inputs.url }}/api/harvest-script"
+          code=$(curl -s -o /tmp/snippet.js -w '%{http_code}' --max-time 30 "$URL" || echo 000)
+          bytes=$(wc -c < /tmp/snippet.js)
+          echo "status $code, ${bytes} bytes"
+          if [ "$code" != "200" ] || [ "$bytes" -lt 5000 ]; then
+            echo "::error::$URL returned $code with ${bytes} bytes — the harvest snippet is not being served."
+            exit 1
+          fi
+          grep -q 'api/import' /tmp/snippet.js || {
+            echo "::error::snippet does not post back to /api/import"; exit 1; }
+          echo "snippet looks well-formed"
+
       - name: Extract a real site on it
         run: node scripts/smoke-container.mjs "${{ inputs.url }}" "${{ inputs.target }}" --loose
 
