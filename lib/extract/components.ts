@@ -48,9 +48,7 @@ export function detectRepeat(
       padding: shorthand(first, 'padding'),
       background: first.styles.backgroundColor,
       radius: first.styles.borderTopLeftRadius,
-      border: first.hasBorder
-        ? `${first.styles.borderTopWidth} ${first.styles.borderStyle} ${first.styles.borderTopColor}`
-        : 'none',
+      border: describeBorder(first),
       shadow: first.styles.boxShadow === 'none' ? '' : first.styles.boxShadow,
     },
     items: group.slice(0, 12).map((node) => describeItem(tree, node)),
@@ -64,6 +62,39 @@ function countColumns(group: HarvestNode[]): number {
   const firstRowTop = group[0].box[1];
   const columns = group.filter((n) => Math.abs(n.box[1] - firstRowTop) < 12).length;
   return Math.max(1, columns);
+}
+
+/**
+ * Describe an element's border from the sides that actually have one.
+ *
+ * `borderStyle` is the four-side shorthand, so pairing it with the *top* width
+ * and color renders a bottom-only rule as "0px none none solid rgb(...)" — a
+ * string that means nothing. Dividers and FAQ rows are bottom-only, so this is
+ * the common case, not an edge case.
+ */
+function describeBorder(node: HarvestNode): string {
+  const s = node.styles;
+  const width = (value: string) => parseFloat(value) || 0;
+
+  const top = width(s.borderTopWidth);
+  const bottom = width(s.borderBottomWidth);
+  const left = width(s.borderLeftWidth);
+  const right = width(s.borderRightWidth);
+  if (top === 0 && bottom === 0 && left === 0 && right === 0) return 'none';
+
+  // A uniform border is written the way an author would write it.
+  if (top > 0 && top === bottom && top === left && top === right) {
+    return `${s.borderTopWidth} ${s.borderTopStyle} ${s.borderTopColor}`;
+  }
+
+  const parts: string[] = [];
+  if (top > 0) parts.push(`border-top: ${s.borderTopWidth} ${s.borderTopStyle} ${s.borderTopColor}`);
+  if (bottom > 0) {
+    parts.push(`border-bottom: ${s.borderBottomWidth} ${s.borderBottomStyle} ${s.borderBottomColor}`);
+  }
+  if (left > 0) parts.push(`border-left: ${s.borderLeftWidth}`);
+  if (right > 0) parts.push(`border-right: ${s.borderRightWidth}`);
+  return parts.join('; ');
 }
 
 function shorthand(node: HarvestNode, prop: 'padding'): string {
@@ -92,7 +123,11 @@ function describeItem(tree: NodeTree, node: HarvestNode): RepeatItem {
       )[0];
 
   const heading = headingNode?.text ?? lines[0] ?? '';
-  const body = lines.find((line) => line !== heading && line.length > 20) ?? '';
+  // Prefer a line of real prose, but fall back to any other line: a stat item's
+  // label ("Median interaction") is far shorter than a card's description, and
+  // requiring prose length drops it entirely.
+  const others = lines.filter((line) => line !== heading);
+  const body = others.find((line) => line.length > 20) ?? others[0] ?? '';
 
   // The item may itself be the image — a logo cloud repeats bare <img>
   // elements, whose descendants contain nothing at all.
@@ -118,8 +153,9 @@ function describeItem(tree: NodeTree, node: HarvestNode): RepeatItem {
  */
 export function findLayoutContainer(tree: NodeTree, sectionIndex: number): HarvestNode {
   const section = tree.get(sectionIndex)!;
-  const candidates = tree
-    .descendants(sectionIndex, 400)
+  const descendants = tree.descendants(sectionIndex, 400);
+
+  const positioned = descendants
     .filter(
       (d) =>
         (d.styles.display.includes('grid') || d.styles.display.includes('flex')) &&
@@ -128,7 +164,16 @@ export function findLayoutContainer(tree: NodeTree, sectionIndex: number): Harve
     )
     .sort((a, b) => b.area - a.area);
 
-  return candidates[0] ?? section;
+  if (positioned[0]) return positioned[0];
+
+  // Not every repeating list is a grid. An FAQ is usually a run of <details>
+  // stacked in a plain block, and looking only for grid/flex would report it as
+  // a wall of loose paragraphs instead of one component repeated N times.
+  const stacked = descendants
+    .filter((d) => d.childCount >= 3 && d.area > section.area * 0.15)
+    .sort((a, b) => b.area - a.area);
+
+  return stacked[0] ?? section;
 }
 
 /** Grid template columns is authoritative; otherwise infer from the first row. */

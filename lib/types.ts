@@ -26,6 +26,12 @@ export interface HarvestStyles {
   backgroundImage: string;
   borderTopColor: string;
   borderTopWidth: string;
+  borderTopStyle: string;
+  borderBottomColor: string;
+  borderBottomWidth: string;
+  borderBottomStyle: string;
+  borderLeftWidth: string;
+  borderRightWidth: string;
   borderTopLeftRadius: string;
   borderStyle: string;
   boxShadow: string;

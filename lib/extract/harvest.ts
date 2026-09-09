@@ -24,6 +24,8 @@ function inPageHarvest(maxNodes: number) {
     'display', 'position', 'flexDirection', 'flexWrap', 'justifyContent',
     'alignItems', 'gap', 'gridTemplateColumns', 'gridAutoFlow', 'color',
     'backgroundColor', 'backgroundImage', 'borderTopColor', 'borderTopWidth',
+    'borderTopStyle', 'borderBottomColor', 'borderBottomWidth', 'borderBottomStyle',
+    'borderLeftWidth', 'borderRightWidth',
     'borderTopLeftRadius', 'borderStyle', 'boxShadow', 'opacity', 'fontFamily',
     'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing',
     'textTransform', 'textAlign', 'textDecorationLine', 'paddingTop',

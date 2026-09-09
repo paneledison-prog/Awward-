@@ -119,10 +119,14 @@ export function collectObservations(nodes: HarvestNode[]): Observation[] {
     push(s.backgroundColor, area, 'background-color', interactive);
 
     if (node.hasBorder) {
-      // A border's visible area is its perimeter times its width.
+      // A border's visible area is its length times its width. Dividers and
+      // table rows are bottom-only, so reading just the top side would miss
+      // the border color on the pages that use it most.
       const [, , w, h] = node.box;
-      const bw = parseFloat(s.borderTopWidth) || 1;
-      push(s.borderTopColor, (w + h) * 2 * bw, 'border-color', false);
+      const top = parseFloat(s.borderTopWidth) || 0;
+      const bottom = parseFloat(s.borderBottomWidth) || 0;
+      if (top > 0) push(s.borderTopColor, (w + h) * 2 * top, 'border-color', false);
+      if (bottom > 0) push(s.borderBottomColor, w * 2 * bottom, 'border-color', false);
     }
 
     if (s.backgroundImage && s.backgroundImage !== 'none') {
