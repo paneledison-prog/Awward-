@@ -95,8 +95,17 @@ Or deploy from your machine:
 | **Railway** | New Project → Deploy from GitHub repo | Reads `railway.json`. Simplest UI; injects `PORT` itself. |
 | **Render** | New → Blueprint → select this repo | Reads `render.yaml`. Needs the Standard plan — free and Starter cap at 512MB and Chromium is OOM-killed. |
 
-After deploying, open the URL and extract something. First request is slow if the
-platform scales to zero.
+After deploying, open the URL and extract something.
+
+**A cold start takes a few seconds.** `fly.toml` scales the machine to zero when
+idle, so the first request after a quiet period waits for it to boot. Fly's
+dashboard may show "Proxy is having trouble reaching app" during that window,
+and Fly Doctor will report the app is not listening — both are describing a
+machine that is asleep, not a fault.
+
+To trade cost for latency, set `min_machines_running = 1` in `fly.toml`. The
+machine then stays up and answers immediately, and you pay for it around the
+clock.
 
 The container image is built and exercised on every push by the `container` job
 in CI: it starts the image, runs a full extraction inside it against a local

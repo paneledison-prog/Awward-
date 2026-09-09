@@ -48,7 +48,12 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-# start:lan binds 0.0.0.0. `next start` reachable only on loopback inside the
-# container would fail every platform health check, and the deploy would be
-# marked unhealthy with the app itself running fine.
-CMD ["npm", "run", "start:lan"]
+# Binds 0.0.0.0: `next start` reachable only on loopback inside the container
+# would fail every platform health check, with the app itself running fine.
+#
+# Invoked directly rather than through `npm run`. The logs show roughly five
+# seconds between the machine starting and npm even printing its banner, all of
+# it before Next begins booting — pure overhead on every cold start, and this
+# app scales to zero, so every first request pays it. `exec` keeps the server
+# as PID 1 so it receives SIGTERM directly and shuts down cleanly.
+CMD ["sh", "-c", "exec node_modules/.bin/next start -H 0.0.0.0 -p ${PORT:-3000}"]
