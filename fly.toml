@@ -1,35 +1,31 @@
-# Fly.io.  fly launch --copy-config --now
+# fly.toml app configuration file generated for awward-stoe on 2026-09-09T10:39:04Z
 #
-# Two values here need changing at launch:
-#   app            — must be globally unique; `fly launch` will prompt and rewrite it
-#   primary_region — set to whichever region is near you (`fly platform regions`)
-app = "designdna"
-primary_region = "iad"
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'awward-stoe'
+primary_region = 'ams'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  PORT = "3000"
-  EXTRACT_TIMEOUT_MS = "60000"
-  SCREENSHOT_DIR = "/app/.screenshots"
+  EXTRACT_TIMEOUT_MS = '60000'
+  PORT = '3000'
+  SCREENSHOT_DIR = '/app/.screenshots'
 
 [http_service]
-  internal_port = 3000
+  internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
-  # Extraction holds a browser open for up to a minute; scaling to zero between
-  # runs is fine, but a request must never land on a machine mid-shutdown.
   min_machines_running = 0
 
   [http_service.concurrency]
-    type = "requests"
-    # One Chromium render at a time per machine keeps memory predictable.
+    type = 'requests'
     hard_limit = 4
     soft_limit = 2
 
 [[vm]]
-  size = "shared-cpu-1x"
-  # Chromium rendering a real page needs headroom; 512MB gets OOM-killed.
-  memory = "1gb"
+  size = 'shared-cpu-1x'
+  memory = '1gb'
