@@ -6,7 +6,6 @@
      dark browser theme, or the card loses the contrast the design rests on. */
   :root {
     color-scheme: light;
-    --page: #f2f1ef;
     --card: #ffffff;
     --ink: #111113;
     --muted: #6b7280;
@@ -15,17 +14,23 @@
     --inset: #f6f5f3;
     --accent: #1a73e8;
     --danger: #c8372d;
-    --radius-card: 20px;
     --radius-field: 12px;
   }
 
   * { box-sizing: border-box; }
 
+  /* The popup window IS the card.
+     A floating card inside the popup cannot work: Chrome draws its own white
+     rounded window behind the document, so any ground colour around the card
+     shows as a second panel behind the first — with the window's own corners
+     and shadow. Painting the document itself as the card leaves nothing
+     behind it to see. */
+  html, body { background: var(--card); }
+
   body {
     width: 372px;
     margin: 0;
-    padding: 14px;
-    background: var(--page);
+    padding: 20px;
     color: var(--ink);
     font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -33,10 +38,6 @@
 
   .card {
     background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-card);
-    padding: 20px;
-    box-shadow: 0 1px 2px rgba(17, 17, 19, .04), 0 8px 24px rgba(17, 17, 19, .06);
   }
 
   /* Identity row: mark, page title, link — mirrors the site card in the design. */
