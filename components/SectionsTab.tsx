@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ExtractionResult, SectionSpec } from '@/lib/types';
+import { Icon } from './Icon';
 
 const KIND_COLOR: Record<string, string> = {
   nav: 'text-fg-dim',
@@ -49,7 +50,9 @@ function SectionCard({ section }: { section: SectionSpec }) {
           {section.layout.columns > 1 ? ` · ${section.layout.columns} cols` : ''}
           {section.repeat ? ` · ${section.repeat.count}×` : ''}
         </span>
-        <span className="shrink-0 text-fg-faint">{open ? '−' : '+'}</span>
+        <span className="shrink-0 text-fg-faint">
+          <Icon name={open ? 'minus' : 'plus'} size={16} />
+        </span>
       </button>
 
       {open ? (

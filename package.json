@@ -19,6 +19,8 @@
     "build:extension": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/build-extension.js"
   },
   "dependencies": {
+    "@hugeicons/core-free-icons": "^4.3.2",
+    "@hugeicons/react": "^1.1.10",
     "culori": "4.0.1",
     "jszip": "3.10.1",
     "next": "16.3.4",

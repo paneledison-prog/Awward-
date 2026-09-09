@@ -138,20 +138,6 @@ body {
   box-shadow: 0 1px 2px rgba(22, 23, 26, 0.08);
 }
 
-/* Feature list marker from the reference — a small four-point sparkle. */
-.feature-list { list-style: none; }
-.feature-list > li {
-  display: flex;
-  gap: 0.7rem;
-  align-items: baseline;
-}
-.feature-list > li::before {
-  content: '❖';
-  color: var(--color-fg-faint);
-  font-size: 0.8em;
-  line-height: 1.6;
-}
-
 ::selection {
   background: #16171a;
   color: #fff;

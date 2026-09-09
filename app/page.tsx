@@ -10,6 +10,7 @@ import { CodeTab } from '@/components/CodeTab';
 import { PromptTab } from '@/components/PromptTab';
 import { AssetsTab } from '@/components/AssetsTab';
 import type { ExtractionResult, JobEvent } from '@/lib/types';
+import { Icon } from '@/components/Icon';
 
 type Tab = 'prompt' | 'overview' | 'sections' | 'code' | 'assets';
 
@@ -202,14 +203,18 @@ export default function Home() {
                 href={`/api/extract/${result.id}/download`}
                 className="btn-dark shrink-0"
               >
-                ↓ Download bundle (.zip)
+                <Icon name="download" size={17} />
+                Download bundle (.zip)
               </a>
             </header>
 
             {result.page.warnings.length ? (
               <ul className="flex flex-col gap-1 rounded-xl border border-amber/25 bg-amber/5 px-4 py-3 text-xs text-amber">
                 {result.page.warnings.map((warning, index) => (
-                  <li key={index}>· {warning}</li>
+                  <li key={index} className="flex items-start gap-2">
+                    <Icon name="alert" size={14} className="mt-0.5" />
+                    {warning}
+                  </li>
                 ))}
               </ul>
             ) : null}

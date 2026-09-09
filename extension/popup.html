@@ -102,7 +102,7 @@
   .tick {
     flex: none; width: 19px; height: 19px; border-radius: 50%;
     background: var(--accent); color: #fff;
-    display: grid; place-items: center; font-size: 11px; font-weight: 700;
+    display: grid; place-items: center;
   }
 
   #status {
@@ -120,10 +120,12 @@
     <div class="site-text">
       <p class="site-name" id="siteName">This page</p>
       <div class="site-url" id="siteUrl">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" aria-hidden="true">
-          <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/>
-          <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>
+        <!-- Hugeicons Link02 (stroke rounded), inlined: the popup is plain HTML
+             and cannot import the React renderer the app uses. -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14.9961 17H16.9961C19.7575 17 21.9961 14.7614 21.9961 12C21.9961 9.23858 19.7575 7 16.9961 7H14.9961M8.99609 17H6.99609C4.23467 17 1.99609 14.7614 1.99609 12C1.99609 9.23858 4.23467 7 6.99609 7H8.99609"/>
+          <path d="M8.49609 12H15.4961"/>
         </svg>
         <span id="siteHost">…</span>
       </div>

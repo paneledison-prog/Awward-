@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Icon } from './Icon';
 
 export function CopyButton({
   text,
@@ -46,7 +47,8 @@ export function CopyButton({
           : 'border-line bg-panel text-fg-dim hover:border-line-bright hover:text-fg'
       } ${className}`}
     >
-      {copied ? '✓ Copied' : label}
+      <Icon name={copied ? 'tick' : 'copy'} size={14} />
+      {copied ? 'Copied' : label}
     </button>
   );
 }

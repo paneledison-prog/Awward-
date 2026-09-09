@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Icon } from './Icon';
 
 /**
  * The escape hatch for sites that will not serve an automated browser.
@@ -34,7 +35,9 @@ export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
           startOpen ? 'bg-panel-2' : ''
         }`}
       >
-        <span className="text-fg-faint">{open ? '−' : '+'}</span>
+        <span className="text-fg-faint">
+          <Icon name={open ? 'minus' : 'plus'} size={16} />
+        </span>
         <span className="text-sm text-fg-dim">
           Site blocked by a bot check? <span className="text-fg">Run it in your own browser.</span>
         </span>
@@ -77,7 +80,8 @@ export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
               onClick={copySnippet}
               className={`btn-dark ${copied ? 'opacity-70' : ''}`}
             >
-              {copied ? '✓ Copied — now type "allow pasting" first' : 'Copy console snippet'}
+              <Icon name={copied ? 'tick' : 'copy'} size={16} />
+              {copied ? 'Copied — now type "allow pasting" first' : 'Copy console snippet'}
             </button>
             <a
               href="/api/harvest-script"
@@ -105,7 +109,8 @@ export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
                 href="/api/extension"
                 className="rounded-md border border-line-bright px-4 py-2 text-sm font-medium text-fg transition hover:border-accent/60"
               >
-                ↓ Download extension (.zip)
+                <Icon name="download" size={16} />
+                Download extension (.zip)
               </a>
               <span className="font-mono text-[11px] text-fg-faint">
                 unzip → chrome://extensions → Developer mode → Load unpacked

@@ -38,6 +38,25 @@ function showSite(t) {
   }
 }
 
+/** Hugeicons Tick02 (stroke rounded) as an inline SVG node. */
+function tickIcon() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('width', '12');
+  svg.setAttribute('height', '12');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', 'M5 14L8.5 17.5L19 6.5');
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '2.4');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  svg.append(path);
+  return svg;
+}
+
 /** What the run actually did — every line is a fact this popup observed. */
 function summarize(shotMode, instance) {
   const shots = {
@@ -65,7 +84,9 @@ function summarize(shotMode, instance) {
     const li = document.createElement('li');
     const tick = document.createElement('span');
     tick.className = 'tick';
-    tick.textContent = '✓';
+    // Hugeicons Tick02, drawn rather than typed: a text checkmark renders at
+    // whatever weight and baseline the system font gives it.
+    tick.append(tickIcon());
     li.append(tick, document.createTextNode(text));
     list.append(li);
   }

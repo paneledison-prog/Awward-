@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ContentMode, ViewportLabel } from '@/lib/types';
+import { Icon } from './Icon';
 
 export interface SiteCandidate {
   url: string;
@@ -94,8 +95,8 @@ export function SearchPanel({
     <div className="w-full">
       <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
-          <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-sm text-fg-faint">
-            →
+          <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-fg-faint">
+            <Icon name="search" size={17} />
           </span>
           <input
             value={input}
@@ -111,6 +112,7 @@ export function SearchPanel({
           className="btn-dark justify-center px-7 py-3.5 disabled:cursor-not-allowed"
         >
           {busy ? 'Extracting…' : resolving ? 'Resolving…' : 'Extract design'}
+          {busy || resolving ? null : <Icon name="arrowRight" size={17} />}
         </button>
       </form>
 

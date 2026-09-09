@@ -1,6 +1,7 @@
 'use client';
 
 import type { JobEvent } from '@/lib/types';
+import { Icon } from './Icon';
 
 export function ProgressPanel({ events, error }: { events: JobEvent[]; error: string }) {
   const latest = events[events.length - 1];
@@ -17,13 +18,13 @@ export function ProgressPanel({ events, error }: { events: JobEvent[]; error: st
         />
       </div>
 
-      <ol className="flex flex-col gap-1.5 font-mono text-xs">
+      <ol className="flex flex-col gap-1.5 text-xs">
         {events.map((event, index) => {
           const done = index < events.length - 1 || event.step === 'done';
           return (
             <li key={`${event.step}-${event.at}-${index}`} className="flex items-start gap-3">
-              <span className={done ? 'text-accent' : 'text-fg-faint animate-pulse-bar'}>
-                {done ? '✓' : '▸'}
+              <span className={done ? 'text-fg' : 'text-fg-faint animate-pulse-bar'}>
+                <Icon name={done ? 'tick' : 'arrowRight'} size={14} className="mt-px" />
               </span>
               <span className="w-10 shrink-0 text-fg-faint">{event.progress}%</span>
               <span className={done ? 'text-fg-dim' : 'text-fg'}>{event.message}</span>
