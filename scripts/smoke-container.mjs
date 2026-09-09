@@ -144,6 +144,30 @@ async function main() {
     );
   }
 
+  /* --- the extension is downloadable ------------------------------------- *
+   * It is served from the extension/ directory, which has to be copied into
+   * the runtime image explicitly. Miss that and the download button hands back
+   * a 404 while every other check still passes.                              */
+  console.log('\nextension');
+  const ext = await fetch(`${BASE}/api/extension`);
+  const extBytes = (await ext.arrayBuffer()).byteLength;
+  check(
+    `extension downloads (${Math.round(extBytes / 1024)}KB)`,
+    ext.status === 200 &&
+      (ext.headers.get('content-type') ?? '').includes('zip') &&
+      extBytes > 5_000,
+    `status ${ext.status}, ${extBytes} bytes`,
+  );
+
+  /* --- the console snippet is served ------------------------------------- */
+  const snippet = await fetch(`${BASE}/api/harvest-script`);
+  const snippetText = await snippet.text();
+  check(
+    `harvest snippet served (${Math.round(snippetText.length / 1024)}KB)`,
+    snippet.status === 200 && snippetText.includes('/api/import'),
+    `status ${snippet.status}, ${snippetText.length} chars`,
+  );
+
   /* --- the bundle downloads ---------------------------------------------- */
   console.log('\nbundle');
   const zip = await fetch(`${BASE}/api/extract/${jobId}/download`);
