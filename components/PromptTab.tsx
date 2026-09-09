@@ -16,11 +16,11 @@ export function PromptTab({ result }: { result: ExtractionResult }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-lg border border-accent/30 bg-accent/5 p-5">
+      <div className="card card-dots p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h3 className="text-sm font-semibold text-fg">Paste this into your AI agent</h3>
-            <p className="mt-1 text-xs text-fg-dim">
+            <h3 className="font-display text-xl text-fg">Paste this into your AI agent</h3>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-fg-dim">
               Works with Claude Code, Cursor, v0, Lovable or any coding agent. It contains the full
               design system, every section, and the build instructions.
             </p>
@@ -28,11 +28,11 @@ export function PromptTab({ result }: { result: ExtractionResult }) {
           <CopyButton
             text={text}
             label={`Copy ${compact ? 'compact' : 'full'} brief`}
-            className="!border-accent !bg-accent !px-5 !py-2.5 !text-sm !font-semibold !text-ink hover:!bg-accent-dim"
+            className="btn-dark !border-0 !text-sm"
           />
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-4 font-mono text-[11px] text-fg-faint">
+        <div className="mt-5 flex flex-wrap items-center gap-5 border-t border-line pt-4 text-xs text-fg-faint">
           <span>{text.length.toLocaleString()} chars</span>
           <span>~{words.toLocaleString()} words</span>
           <span>≈{Math.ceil(text.length / 4).toLocaleString()} tokens</span>
@@ -45,10 +45,10 @@ export function PromptTab({ result }: { result: ExtractionResult }) {
                 key={option.label}
                 type="button"
                 onClick={() => setCompact(option.value)}
-                className={`rounded border px-2 py-1 transition ${
+                className={`rounded-full border px-3 py-1 transition ${
                   compact === option.value
-                    ? 'border-accent/50 bg-accent/10 text-accent'
-                    : 'border-line text-fg-faint hover:border-line-bright'
+                    ? 'border-transparent bg-fg text-panel'
+                    : 'border-line text-fg-dim hover:border-line-bright'
                 }`}
               >
                 {option.label}
@@ -58,7 +58,7 @@ export function PromptTab({ result }: { result: ExtractionResult }) {
         </div>
       </div>
 
-      <pre className="scroll-thin max-h-[68vh] overflow-auto rounded-lg border border-line bg-panel p-5 font-mono text-xs leading-relaxed whitespace-pre-wrap text-fg-dim">
+      <pre className="scroll-thin max-h-[68vh] overflow-auto rounded-xl border border-line bg-panel-2 p-6 font-mono text-xs leading-relaxed whitespace-pre-wrap text-fg-dim">
         {text}
       </pre>
     </div>

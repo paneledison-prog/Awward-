@@ -40,10 +40,10 @@ export function CopyButton({
     <button
       type="button"
       onClick={copy}
-      className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition ${
+      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
         copied
-          ? 'border-accent bg-accent/10 text-accent'
-          : 'border-line-bright bg-panel-2 text-fg-dim hover:border-accent/60 hover:text-fg'
+          ? 'border-transparent bg-fg text-panel'
+          : 'border-line bg-panel text-fg-dim hover:border-line-bright hover:text-fg'
       } ${className}`}
     >
       {copied ? '✓ Copied' : label}

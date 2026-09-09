@@ -22,7 +22,7 @@ function SectionCard({ section }: { section: SectionSpec }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="rounded-lg border border-line bg-panel">
+    <div className="card">
       {/*
         Wraps to two rows on a phone: index, kind and metrics stay on the first
         line and the heading takes the second. Laid out as one row of fixed
@@ -144,7 +144,7 @@ export function SectionsTab({ result }: { result: ExtractionResult }) {
 
       {shot ? (
         <div className="hidden lg:block">
-          <div className="sticky top-6 rounded-lg border border-line bg-panel p-3">
+          <div className="sticky top-6 card p-3">
             <p className="mb-2 text-xs uppercase tracking-wider text-fg-faint">Desktop render</p>
             <div className="max-h-[70vh] overflow-y-auto rounded scroll-thin">
               {/* eslint-disable-next-line @next/next/no-img-element */}

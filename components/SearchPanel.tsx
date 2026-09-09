@@ -94,7 +94,7 @@ export function SearchPanel({
     <div className="w-full">
       <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
-          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-mono text-sm text-fg-faint">
+          <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-sm text-fg-faint">
             →
           </span>
           <input
@@ -102,27 +102,27 @@ export function SearchPanel({
             onChange={(event) => setInput(event.target.value)}
             placeholder="stripe.com, linear, or https://example.com/pricing"
             disabled={busy}
-            className="w-full rounded-lg border border-line bg-panel py-3.5 pl-11 pr-4 font-mono text-sm text-fg placeholder:text-fg-faint focus:border-accent/60 focus:outline-none disabled:opacity-50"
+            className="w-full rounded-full border border-line bg-panel py-3.5 pl-12 pr-5 text-sm text-fg shadow-[0_1px_2px_rgba(22,23,26,0.04)] placeholder:text-fg-faint focus:border-line-bright focus:outline-none disabled:opacity-50"
           />
         </div>
         <button
           type="submit"
           disabled={busy || resolving || !input.trim()}
-          className="rounded-lg bg-accent px-6 py-3.5 text-sm font-semibold text-ink transition hover:bg-accent-dim disabled:cursor-not-allowed disabled:opacity-40"
+          className="btn-dark justify-center px-7 py-3.5 disabled:cursor-not-allowed"
         >
           {busy ? 'Extracting…' : resolving ? 'Resolving…' : 'Extract design'}
         </button>
       </form>
 
       {error ? (
-        <p className="mt-3 rounded-md border border-rose/30 bg-rose/5 px-3 py-2 text-sm text-rose">
+        <p className="mt-3 rounded-lg border border-rose/25 bg-rose/5 px-4 py-2.5 text-sm text-rose">
           {error}
         </p>
       ) : null}
 
       {candidates.length > 0 ? (
-        <div className="mt-4 rounded-lg border border-line bg-panel p-3">
-          <p className="mb-2 text-xs uppercase tracking-wider text-fg-faint">
+        <div className="card mt-4 p-3">
+          <p className="mb-2 px-3 text-xs uppercase tracking-wider text-fg-faint">
             Several sites match — pick one
           </p>
           <div className="flex flex-col gap-1">
@@ -131,13 +131,13 @@ export function SearchPanel({
                 key={candidate.url}
                 type="button"
                 onClick={() => start(candidate.url)}
-                className="flex items-start gap-3 rounded-md px-3 py-2 text-left transition hover:bg-panel-2"
+                className="flex items-start gap-3 rounded-lg px-3 py-2 text-left transition hover:bg-panel-2"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={candidate.favicon} alt="" width={16} height={16} className="mt-1 h-4 w-4 shrink-0" />
                 <span className="min-w-0">
                   <span className="block truncate text-sm text-fg">{candidate.title}</span>
-                  <span className="block truncate font-mono text-xs text-fg-faint">{candidate.url}</span>
+                  <span className="block truncate text-xs text-fg-faint">{candidate.url}</span>
                 </span>
               </button>
             ))}
@@ -145,7 +145,7 @@ export function SearchPanel({
         </div>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs">
+      <div className="mt-5 flex flex-wrap items-center gap-x-7 gap-y-3 text-xs">
         <div className="flex items-center gap-2">
           <span className="text-fg-faint">Viewports</span>
           {(Object.keys(VIEWPORT_LABELS) as ViewportLabel[]).map((label) => (
@@ -154,10 +154,10 @@ export function SearchPanel({
               type="button"
               onClick={() => toggleViewport(label)}
               disabled={busy}
-              className={`rounded border px-2 py-1 font-mono transition ${
+              className={`rounded-full border px-3 py-1.5 transition ${
                 viewports.includes(label)
-                  ? 'border-accent/50 bg-accent/10 text-accent'
-                  : 'border-line text-fg-faint hover:border-line-bright'
+                  ? 'border-transparent bg-fg text-panel'
+                  : 'border-line bg-panel text-fg-dim hover:border-line-bright'
               }`}
             >
               {VIEWPORT_LABELS[label]}
@@ -173,10 +173,10 @@ export function SearchPanel({
               type="button"
               onClick={() => setContentMode(mode)}
               disabled={busy}
-              className={`rounded border px-2 py-1 font-mono transition ${
+              className={`rounded-full border px-3 py-1.5 transition ${
                 contentMode === mode
-                  ? 'border-violet/50 bg-violet/10 text-violet'
-                  : 'border-line text-fg-faint hover:border-line-bright'
+                  ? 'border-transparent bg-fg text-panel'
+                  : 'border-line bg-panel text-fg-dim hover:border-line-bright'
               }`}
             >
               {mode}
@@ -195,10 +195,10 @@ export function SearchPanel({
               type="button"
               onClick={() => option.set(!option.on)}
               disabled={busy}
-              className={`rounded border px-2 py-1 font-mono transition ${
+              className={`rounded-full border px-3 py-1.5 transition ${
                 option.on
-                  ? 'border-amber/50 bg-amber/10 text-amber'
-                  : 'border-line text-fg-faint hover:border-line-bright'
+                  ? 'border-transparent bg-fg text-panel'
+                  : 'border-line bg-panel text-fg-dim hover:border-line-bright'
               }`}
             >
               {option.label}

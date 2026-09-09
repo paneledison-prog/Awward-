@@ -26,12 +26,12 @@ export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
   };
 
   return (
-    <div className="rounded-lg border border-line bg-panel">
+    <div className="card overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         className={`flex w-full items-center gap-3 px-4 py-3 text-left ${
-          startOpen ? 'bg-accent/5' : ''
+          startOpen ? 'bg-panel-2' : ''
         }`}
       >
         <span className="text-fg-faint">{open ? '−' : '+'}</span>
@@ -51,22 +51,22 @@ export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
 
           <ol className="mb-4 flex flex-col gap-2 text-sm text-fg-dim">
             <li>
-              <span className="mr-2 font-mono text-xs text-accent">1</span>
+              <span className="mr-2 text-xs font-semibold text-fg-faint">1</span>
               Open the page you want in a normal tab.
             </li>
             <li>
-              <span className="mr-2 font-mono text-xs text-accent">2</span>
+              <span className="mr-2 text-xs font-semibold text-fg-faint">2</span>
               Open DevTools → Console (<code className="font-mono text-xs text-fg">F12</code>, or{' '}
               <code className="font-mono text-xs text-fg">⌥⌘J</code> on a Mac).
             </li>
             <li>
-              <span className="mr-2 font-mono text-xs text-accent">3</span>
+              <span className="mr-2 text-xs font-semibold text-fg-faint">3</span>
               Type <code className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-xs text-amber">allow pasting</code>{' '}
               and press Enter. Chrome blocks pasting into the console until you do — once per
               browser profile.
             </li>
             <li>
-              <span className="mr-2 font-mono text-xs text-accent">4</span>
+              <span className="mr-2 text-xs font-semibold text-fg-faint">4</span>
               Paste the snippet and press Enter. Results open in a new tab.
             </li>
           </ol>
@@ -75,11 +75,7 @@ export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
             <button
               type="button"
               onClick={copySnippet}
-              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
-                copied
-                  ? 'bg-accent/20 text-accent'
-                  : 'bg-accent text-ink hover:bg-accent-dim'
-              }`}
+              className={`btn-dark ${copied ? 'opacity-70' : ''}`}
             >
               {copied ? '✓ Copied — now type "allow pasting" first' : 'Copy console snippet'}
             </button>
@@ -87,7 +83,7 @@ export function BrowserHarvest({ startOpen = false }: { startOpen?: boolean }) {
               href="/api/harvest-script"
               target="_blank"
               rel="noreferrer noopener"
-              className="font-mono text-xs text-fg-faint underline hover:text-fg-dim"
+              className="text-xs text-fg-faint underline hover:text-fg-dim"
             >
               view the script
             </a>

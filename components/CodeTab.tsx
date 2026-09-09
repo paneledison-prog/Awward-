@@ -26,7 +26,7 @@ export function CodeTab({ files }: { files: EmittedFile[] }) {
         page wider than a phone screen. truncate cannot shrink past that floor
         without it.
       */}
-      <nav className="min-w-0 rounded-lg border border-line bg-panel p-2">
+      <nav className="min-w-0 card p-2">
         <ul className="flex flex-col">
           {files.map((entry) => (
             <li key={entry.path}>
@@ -54,7 +54,7 @@ export function CodeTab({ files }: { files: EmittedFile[] }) {
       </nav>
 
       {file ? (
-        <div className="min-w-0 rounded-lg border border-line bg-panel">
+        <div className="min-w-0 card">
           <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
             <div className="flex min-w-0 items-center gap-3">
               <code className="truncate font-mono text-xs text-fg">{file.path}</code>

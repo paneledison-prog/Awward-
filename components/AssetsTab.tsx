@@ -9,7 +9,7 @@ export function AssetsTab({ result }: { result: ExtractionResult }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="rounded-lg border border-line bg-panel p-5">
+      <section className="card p-6">
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-faint">
           Fonts
         </h3>
@@ -39,7 +39,7 @@ export function AssetsTab({ result }: { result: ExtractionResult }) {
         )}
       </section>
 
-      <section className="rounded-lg border border-line bg-panel p-5">
+      <section className="card p-6">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-faint">Icons</h3>
         {assets.icons.count === 0 ? (
           <p className="text-sm text-fg-faint">No inline SVG icons detected.</p>
@@ -65,7 +65,7 @@ export function AssetsTab({ result }: { result: ExtractionResult }) {
         </section>
       ) : null}
 
-      <section className="rounded-lg border border-line bg-panel p-5">
+      <section className="card p-6">
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-faint">
           Images ({assets.images.length})
         </h3>
@@ -102,7 +102,7 @@ export function AssetsTab({ result }: { result: ExtractionResult }) {
         </div>
       </section>
 
-      <section className="rounded-lg border border-line bg-panel p-5">
+      <section className="card p-6">
         <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-faint">
           Screenshots
         </h3>

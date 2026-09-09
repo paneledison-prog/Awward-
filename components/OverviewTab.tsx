@@ -17,7 +17,7 @@ function Swatch({ hex, name, sub }: { hex: string; name: string; sub?: string })
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-line bg-panel p-5">
+    <section className="card p-6">
       <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-faint">{title}</h3>
       {children}
     </section>

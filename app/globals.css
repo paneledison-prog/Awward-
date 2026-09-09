@@ -1,26 +1,45 @@
 @import "tailwindcss";
 
+/*
+ * A warm paper ground, white cards, ink-black controls.
+ *
+ * The names are semantic (`panel`, `line`, `fg-dim`) and every component uses
+ * them rather than raw colors, so the whole surface is themed from this block.
+ */
 @theme {
-  --color-ink: #06070a;
-  --color-panel: #0d0f14;
-  --color-panel-2: #12151c;
-  --color-line: #1e2430;
-  --color-line-bright: #2c3543;
-  --color-fg: #e6e9ef;
-  --color-fg-dim: #9aa4b5;
-  --color-fg-faint: #67707f;
-  --color-accent: #6ee7b7;
-  --color-accent-dim: #34d399;
-  --color-violet: #a78bfa;
-  --color-amber: #fbbf24;
-  --color-rose: #fb7185;
+  --color-ink: #f0efed;          /* page ground — warm off-white, never pure grey */
+  --color-panel: #ffffff;        /* raised card */
+  --color-panel-2: #f6f5f3;      /* inset well inside a card */
+  --color-panel-3: #e9e8e5;      /* the recessed tray a group of cards sits in */
+  --color-line: #e5e3df;         /* hairline */
+  --color-line-bright: #d6d3cd;  /* hairline, one step stronger */
+  --color-fg: #16171a;           /* ink */
+  --color-fg-dim: #56585e;
+  --color-fg-faint: #8b8d93;
+  --color-accent: #1a73e8;       /* links, focus, the active tab */
+  --color-accent-dim: #1557b0;
+  --color-violet: #6d28d9;
+  --color-amber: #b45309;
+  --color-rose: #be123c;
 
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* High-contrast serif for display type. Local faces only — no webfont
+     request, so the heading paints with the first frame. */
+  --font-display: "Playfair Display", "Iowan Old Style", "Palatino Linotype",
+    Palatino, "Book Antiqua", Georgia, serif;
+
+  /* Softer than Tailwind's defaults across the board: nothing in this design
+     has a tight corner. */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -28,37 +47,114 @@ body {
   color: var(--color-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/*
- * A quiet grid behind the header, so the page reads as a tool rather than a form.
- *
- * The fade lives on a pseudo-element rather than the container: a mask applied
- * to the container clips its children too, which fades out the intro copy and
- * hides the search field.
- */
-.grid-backdrop {
-  position: relative;
-  isolation: isolate;
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
 }
 
-.grid-backdrop::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
+/* A raised card: white, hairline, and a shadow shallow enough to read as paper
+   rather than as a dropdown. */
+.card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    0 1px 2px rgba(22, 23, 26, 0.04),
+    0 12px 28px -14px rgba(22, 23, 26, 0.18);
+}
+
+/* The four corner screws. Drawn as background gradients so no card needs four
+   extra empty elements to carry them. */
+.card-dots {
   background-image:
-    linear-gradient(to right, rgba(110, 231, 183, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(110, 231, 183, 0.05) 1px, transparent 1px);
-  background-size: 44px 44px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 35%, transparent 100%);
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 35%, transparent 100%);
+    radial-gradient(circle at 14px 14px, var(--color-line-bright) 1.5px, transparent 1.6px),
+    radial-gradient(circle at calc(100% - 14px) 14px, var(--color-line-bright) 1.5px, transparent 1.6px),
+    radial-gradient(circle at 14px calc(100% - 14px), var(--color-line-bright) 1.5px, transparent 1.6px),
+    radial-gradient(circle at calc(100% - 14px) calc(100% - 14px), var(--color-line-bright) 1.5px, transparent 1.6px);
+  background-repeat: no-repeat;
+}
+
+/* The recessed tray behind a group of cards. */
+.tray {
+  background: var(--color-panel-3);
+  border-radius: var(--radius-2xl);
+}
+
+/* Ink pill — the one button style that commits to something. */
+.btn-dark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background: #16171a;
+  color: #fff;
+  padding: 0.7rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.btn-dark:hover:not(:disabled) { background: #000; }
+.btn-dark:active:not(:disabled) { transform: translateY(1px); }
+.btn-dark:disabled { opacity: 0.45; cursor: default; }
+
+/* Outlined pill — the way out, never the way forward. */
+.btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  color: var(--color-fg);
+  padding: 0.7rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.btn-quiet:hover { border-color: var(--color-line-bright); background: var(--color-panel-2); }
+
+/* Segmented control, as on the pricing card. */
+.segment {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--color-panel-2);
+  border: 1px solid var(--color-line);
+}
+.segment > button {
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8125rem;
+  color: var(--color-fg-dim);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.segment > button[aria-pressed='true'] {
+  background: var(--color-panel);
+  color: var(--color-fg);
+  box-shadow: 0 1px 2px rgba(22, 23, 26, 0.08);
+}
+
+/* Feature list marker from the reference — a small four-point sparkle. */
+.feature-list { list-style: none; }
+.feature-list > li {
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+}
+.feature-list > li::before {
+  content: '❖';
+  color: var(--color-fg-faint);
+  font-size: 0.8em;
+  line-height: 1.6;
 }
 
 ::selection {
-  background: var(--color-accent);
-  color: var(--color-ink);
+  background: #16171a;
+  color: #fff;
 }
 
 *:focus-visible {
@@ -74,7 +170,7 @@ body {
   border-radius: 6px;
   border: 2px solid var(--color-panel);
 }
-.scroll-thin::-webkit-scrollbar-thumb:hover { background: #3d4859; }
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: #bdb9b1; }
 
 @keyframes pulse-bar {
   0%, 100% { opacity: 0.35; }

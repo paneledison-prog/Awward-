@@ -7,7 +7,7 @@ export function ProgressPanel({ events, error }: { events: JobEvent[]; error: st
   const progress = error ? 100 : (latest?.progress ?? 0);
 
   return (
-    <div className="rounded-lg border border-line bg-panel p-5">
+    <div className="card p-6">
       <div className="mb-4 h-1 w-full overflow-hidden rounded-full bg-line">
         <div
           className={`h-full rounded-full transition-[width] duration-500 ${
