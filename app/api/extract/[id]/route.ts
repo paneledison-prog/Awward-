@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getJob } from '@/lib/jobs';
+import { getFinishedJob } from '@/lib/jobs';
 
 export const runtime = 'nodejs';
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const job = getJob(id);
+  const job = await getFinishedJob(id);
 
   if (!job) {
     return NextResponse.json(
-      { error: 'That extraction is no longer available. Jobs are kept in memory and expire.' },
+      { error: 'That extraction is no longer available. Extractions expire after a while.' },
       { status: 404 },
     );
   }

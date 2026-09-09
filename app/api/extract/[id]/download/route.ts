@@ -1,4 +1,4 @@
-import { getJob } from '@/lib/jobs';
+import { getFinishedJob } from '@/lib/jobs';
 import { buildZip } from '@/lib/emit/bundle';
 
 export const runtime = 'nodejs';
@@ -13,7 +13,7 @@ function safeFilename(input: string): string {
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const job = getJob(id);
+  const job = await getFinishedJob(id);
 
   if (!job?.result) {
     return new Response('Extraction not found or not finished.', { status: 404 });

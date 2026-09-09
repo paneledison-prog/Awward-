@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 /**
@@ -46,4 +46,20 @@ export async function readScreenshot(name: string): Promise<Buffer | null> {
 /** Recover the on-disk name from a URL produced by screenshotUrl. */
 export function nameFromUrl(url: string): string {
   return url.split('/').pop() ?? '';
+}
+
+/** Delete every screenshot belonging to a job. Used by the TTL sweeper, which
+ *  otherwise leaks one image per viewport per extraction forever. */
+export async function deleteScreenshotsFor(jobId: string): Promise<void> {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/.test(jobId)) return;
+  let entries: string[];
+  try {
+    entries = await readdir(/*turbopackIgnore: true*/ DIR);
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!NAME_RE.test(entry) || !entry.startsWith(`${jobId}-`)) continue;
+    await rm(join(/*turbopackIgnore: true*/ DIR, entry), { force: true });
+  }
 }

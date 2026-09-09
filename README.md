@@ -155,8 +155,9 @@ All optional — see `.env.example`.
 |---|---|---|
 | `PORT` | `3000` | Server port. |
 | `EXTRACT_TIMEOUT_MS` | `60000` | Per-page render budget. |
-| `JOB_TTL_MS` | `1800000` | How long finished results stay in memory. |
+| `JOB_TTL_MS` | `1800000` | How long a finished result is kept before it is swept from memory and disk. |
 | `SCREENSHOT_DIR` | `.screenshots` | Where full-page renders are written. Must be outside `public/`. |
+| `RESULT_DIR` | `.results` | Where finished results are mirrored so they survive a restart. |
 | `CHROMIUM_EXECUTABLE_PATH` | — | Explicit Chromium path, when Playwright's own copy is not the one you want. |
 | `HOSTNAME` / `-H` | `localhost` | `npm run start:lan` binds `0.0.0.0` so other devices on the network can connect. |
 | `HTTPS_PROXY` | — | Routes the browser through a proxy. |
@@ -226,6 +227,13 @@ Extraction state is in memory. A job created by `POST /api/extract` is visible
 only to the process that created it, and the progress stream, the result, the
 screenshots and the ZIP must all reach that same process. **Run exactly one
 instance.**
+
+A *finished* result is also written to `RESULT_DIR`, so it outlives that
+process: the machine can scale to zero while you are reading your results, and
+the result page and the ZIP download still work when it wakes up. Screenshots
+already live on the same filesystem, so a restored result keeps its images.
+Both copies are deleted together once `JOB_TTL_MS` has passed. This does not
+make the app multi-instance — an in-flight job still belongs to one process.
 
 On Fly that means pinning `scale count 1` (the deploy workflow does this) and
 keeping the concurrency limits well above normal traffic — they count open
