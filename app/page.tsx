@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { SearchPanel, type ExtractRequest } from '@/components/SearchPanel';
 import { BrowserHarvest } from '@/components/BrowserHarvest';
 import { ProgressPanel } from '@/components/ProgressPanel';
@@ -151,6 +152,14 @@ export default function Home() {
               being told the fix exists is no use if it stays collapsed. */}
           <BrowserHarvest startOpen={/bot check/i.test(error)} />
         </div>
+
+        <p className="mt-5 text-center text-sm text-fg-dim">
+          Driving this from a coding agent?{' '}
+          <Link href="/connect" className="text-accent hover:underline">
+            Connect it over MCP
+          </Link>
+          .
+        </p>
       </div>
 
       <div className="mx-auto w-full max-w-6xl px-6 py-10">

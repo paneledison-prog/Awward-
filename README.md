@@ -59,6 +59,49 @@ inferred roles, icon-library fingerprinting, and full-page screenshots at every 
 
 Everything downloads as one ZIP.
 
+## Driving it from a coding agent
+
+The instance is an **MCP server** at `/api/mcp`. Point Claude Code at it once:
+
+```bash
+claude mcp add --transport http designdna https://<your-instance>/api/mcp
+```
+
+or, for anything with a config file:
+
+```json
+{ "mcpServers": { "designdna": { "type": "http", "url": "https://<your-instance>/api/mcp" } } }
+```
+
+Eleven tools. The ones that matter:
+
+| Tool | What it does |
+|---|---|
+| `extract_page` | Render a page at up to three viewports and measure all of it. |
+| `extract_component` | Measure **only** the element matching a CSS selector. A selector that matches nothing fails the call — it never widens to the page. |
+| `list_components` | Every section and repeating group in an extraction, with an id. |
+| `get_component` | One component as React, HTML, tokens, or its own build brief — from a stored result, so no second render. |
+| `get_brief`, `get_screenshot`, `get_bundle` | The deliverables. |
+| `request_browser_capture` | Ask a human's browser for a page this renderer cannot reach. |
+
+`/connect` on a running instance shows the same thing with the endpoint filled in.
+
+### When the site refuses the renderer
+
+An agent that hits a bot check gets told to call `request_browser_capture`. That queues a
+note for the browser extension — **never a command**. The extension polls, badges the
+count, and shows the URL, the selector and the agent's stated reason with **Capture** and
+**Dismiss**. Nothing opens a tab or reads a page until you click, and host permission for
+that origin is requested at the click. The capture completes the job the agent is already
+polling, so declining surfaces to it as a failed extraction with your reason attached —
+not a poll that never resolves.
+
+> **The MCP endpoint is not authenticated.** Anyone who learns the URL can drive this
+> instance's browser and queue capture requests into your extension. Two things bound
+> that: `robots.txt` is enforced on every server-side render, and a queued capture cannot
+> run in your browser without your click. If that is not enough for where you deploy it,
+> put it behind a private network or a proxy that requires a header.
+
 ## Running it
 
 ### Docker
@@ -158,6 +201,8 @@ All optional — see `.env.example`.
 | `JOB_TTL_MS` | `1800000` | How long a finished result is kept before it is swept from memory and disk. |
 | `SCREENSHOT_DIR` | `.screenshots` | Where full-page renders are written. Must be outside `public/`. |
 | `RESULT_DIR` | `.results` | Where finished results are mirrored so they survive a restart. |
+| `REQUEST_DIR` | `.requests` | Where queued browser captures are kept. |
+| `REQUEST_TTL_MS` | `3600000` | How long a queued capture waits before expiring. |
 | `CHROMIUM_EXECUTABLE_PATH` | — | Explicit Chromium path, when Playwright's own copy is not the one you want. |
 | `HOSTNAME` / `-H` | `localhost` | `npm run start:lan` binds `0.0.0.0` so other devices on the network can connect. |
 | `HTTPS_PROXY` | — | Routes the browser through a proxy. |
@@ -207,6 +252,10 @@ lib/extract/effects.ts      ─┘
 lib/extract/sections.ts      segment + classify sections
 lib/extract/components.ts    detect repeating sibling groups
 lib/emit/*                   tokens · React · HTML · agent brief · ZIP
+
+lib/mcp/server.ts            JSON-RPC: initialize · tools/list · tools/call
+lib/mcp/tools.ts             the eleven tools, over the pipeline above
+lib/requests.ts              captures queued for the browser extension
 ```
 
 ## Scope and conduct

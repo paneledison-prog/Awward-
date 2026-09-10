@@ -14,6 +14,14 @@
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const BASE = (args[0] ?? process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
 const TARGET = args[1] ?? process.env.SMOKE_TARGET_URL ?? 'http://127.0.0.1:4321/marketing.html';
+/**
+ * The element `extract_component` is pointed at.
+ *
+ * The fixture page has a `.pricing` section; an arbitrary deployed target may
+ * have nothing in particular, so loose runs scope to `body` — which still
+ * exercises the whole selector path, just without narrowing.
+ */
+const SELECTOR = args[2] ?? process.env.SMOKE_SELECTOR ?? (process.argv.includes('--loose') ? 'body' : '.pricing');
 
 /**
  * Strict mode asserts the exact design system the bundled fixture is known to
@@ -166,6 +174,133 @@ async function main() {
     `harvest snippet served (${Math.round(snippetText.length / 1024)}KB)`,
     snippet.status === 200 && snippetText.includes('/api/import'),
     `status ${snippet.status}, ${snippetText.length} chars`,
+  );
+
+
+  /* --- the MCP surface an agent connects to ------------------------------ */
+  console.log('\nMCP');
+
+  const rpc = async (method, params) => {
+    const res = await fetch(`${BASE}/api/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    });
+    return { status: res.status, body: res.status === 202 ? null : await res.json() };
+  };
+
+  const handshake = await rpc('initialize', {
+    protocolVersion: '2025-06-18',
+    capabilities: {},
+    clientInfo: { name: 'smoke', version: '1' },
+  });
+  check(
+    'MCP initialize answers with a protocol version',
+    handshake.body?.result?.protocolVersion === '2025-06-18' &&
+      handshake.body?.result?.serverInfo?.name === 'designdna',
+    JSON.stringify(handshake.body).slice(0, 160),
+  );
+
+  const listed = await rpc('tools/list');
+  const toolNames = (listed.body?.result?.tools ?? []).map((t) => t.name);
+  check(
+    `MCP exposes ${toolNames.length} tools`,
+    ['extract_page', 'extract_component', 'list_components', 'get_component', 'request_browser_capture'].every(
+      (name) => toolNames.includes(name),
+    ),
+    toolNames.join(', '),
+  );
+
+  const components = await rpc('tools/call', {
+    name: 'list_components',
+    arguments: { extraction_id: jobId },
+  });
+  const componentText = components.body?.result?.content?.[0]?.text ?? '';
+  const firstComponent = componentText.match(/- (section-\d+-[a-z-]+)/)?.[1];
+  check(
+    `list_components names the sections (${firstComponent ?? 'none'})`,
+    Boolean(firstComponent),
+    componentText.slice(0, 200),
+  );
+
+  const code = await rpc('tools/call', {
+    name: 'get_component',
+    arguments: { extraction_id: jobId, component_id: firstComponent, format: 'react' },
+  });
+  const codeText = code.body?.result?.content?.[0]?.text ?? '';
+  check(
+    'get_component returns compilable-looking React for one component',
+    codeText.includes('export function') && codeText.includes('.tsx'),
+    codeText.slice(0, 200),
+  );
+
+  /* --- a component extraction, rendered for real ------------------------- */
+  const componentRun = await rpc('tools/call', {
+    name: 'extract_component',
+    arguments: {
+      url: TARGET,
+      selector: SELECTOR,
+      viewports: ['desktop'],
+      wait_seconds: 200,
+    },
+  });
+  const componentRunText = componentRun.body?.result?.content?.[0]?.text ?? '';
+  check(
+    `extract_component measures one element (${SELECTOR})`,
+    !componentRun.body?.result?.isError && /Extracted one component/.test(componentRunText),
+    componentRunText.slice(0, 240),
+  );
+
+  const missing = await rpc('tools/call', {
+    name: 'extract_component',
+    arguments: { url: TARGET, selector: '.no-such-element-anywhere', wait_seconds: 200 },
+  });
+  const missingText = missing.body?.result?.content?.[0]?.text ?? '';
+  check(
+    'a selector that matches nothing fails loudly',
+    missing.body?.result?.isError === true && /No element matches/.test(missingText),
+    missingText.slice(0, 200),
+  );
+
+  /* --- the capture queue the extension polls ----------------------------- */
+  const queued = await rpc('tools/call', {
+    name: 'request_browser_capture',
+    arguments: { url: 'https://example.com/', selector: '.pricing', note: 'smoke check' },
+  });
+  const queuedText = queued.body?.result?.content?.[0]?.text ?? '';
+  const requestJob = queuedText.match(/extraction_id: (\S+)/)?.[1];
+  check('request_browser_capture queues a capture', Boolean(requestJob), queuedText.slice(0, 200));
+
+  const pending = await fetch(`${BASE}/api/extension/requests`).then((r) => r.json());
+  const queuedRequest = (pending.requests ?? []).find((r) => r.selector === '.pricing');
+  check(
+    'the extension sees it pending',
+    Boolean(queuedRequest),
+    JSON.stringify(pending).slice(0, 200),
+  );
+
+  if (queuedRequest) {
+    const declined = await fetch(`${BASE}/api/extension/requests/${queuedRequest.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'decline', message: 'smoke check' }),
+    }).then((r) => r.json());
+
+    const after = await fetch(`${BASE}/api/extract/${requestJob}`).then((r) => r.json());
+    check(
+      'declining fails the extraction the agent is polling',
+      declined.status === 'declined' && after.status === 'error',
+      `${JSON.stringify(declined)} / ${JSON.stringify(after).slice(0, 120)}`,
+    );
+  }
+
+  /* --- the connect page -------------------------------------------------- */
+  const connect = await fetch(`${BASE}/connect`);
+  const connectHtml = await connect.text();
+  check(
+    'GET /connect documents the endpoint',
+    connect.status === 200 && connectHtml.includes('/api/mcp'),
+    `status ${connect.status}`,
   );
 
   /* --- the bundle downloads ---------------------------------------------- */
