@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createJob, emitProgress, failJob, finishJob } from '@/lib/jobs';
-import { runExtraction } from '@/lib/extract';
+import { startExtraction } from '@/lib/start';
 import { normalizeUrl } from '@/lib/resolve';
 import type { ContentMode, ExtractOptions, ViewportLabel } from '@/lib/types';
 
@@ -45,17 +44,7 @@ export async function POST(request: Request) {
     emitHtml: body.emitHtml !== false,
   };
 
-  const job = createJob(options);
-
-  // Deliberately not awaited: the client follows progress over SSE, and holding
-  // the request open for a minute would hit every intermediate proxy timeout.
-  void runExtraction(job.id, options, (step, message, progress) =>
-    emitProgress(job.id, step, message, progress),
-  )
-    .then((result) => finishJob(job.id, result))
-    .catch((error: unknown) => {
-      failJob(job.id, error instanceof Error ? error.message : String(error));
-    });
+  const job = startExtraction(options);
 
   return NextResponse.json({ jobId: job.id, url }, { status: 202 });
 }

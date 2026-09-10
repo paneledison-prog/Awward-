@@ -252,143 +252,167 @@ function buildLayout(
   };
 }
 
+/**
+ * Build one section from an arbitrary node.
+ *
+ * Split out of `buildSections` so a single element can be described through the
+ * same code path a whole-page section goes through: component extraction then
+ * comes down to choosing the node, not to a second implementation that drifts.
+ */
+export function buildSectionSpec(
+  tree: NodeTree,
+  node: HarvestNode,
+  ctx: {
+    order: number;
+    total: number;
+    /** Skip classification — a whole page standing in as one section is an
+     *  article, not a hero: its <h1> is the document title. */
+    forceKind?: SectionKind;
+    id?: string;
+  },
+): SectionSpec {
+  const descendants = tree.descendants(node.i);
+  const text = node.subtreeText;
+
+  const layoutContainer = findLayoutContainer(tree, node.i);
+  const provisionalRepeat = detectRepeat(tree, layoutContainer.i, 'Item');
+  const repeatIsImages =
+    provisionalRepeat !== undefined &&
+    provisionalRepeat.items.filter((item) => item.image).length >= provisionalRepeat.count - 1;
+
+  const kind: SectionKind =
+    ctx.forceKind ??
+    classify({
+        node,
+        tree,
+        descendants,
+        text,
+        order: ctx.order,
+        total: ctx.total,
+        hasH1: descendants.some((d) => d.tag === 'h1' && d.text),
+        repeatCount: provisionalRepeat?.count ?? 0,
+        repeatIsImages,
+      });
+
+  // Nav and footer link lists are not "components"; naming them as such adds
+  // a meaningless <NavItem> to the emitted code.
+  const repeat =
+    kind === 'nav' || kind === 'footer'
+      ? undefined
+      : provisionalRepeat
+        ? { ...provisionalRepeat, componentName: COMPONENT_NAMES[kind] ?? 'Item' }
+        : undefined;
+
+  const isChrome = kind === 'nav' || kind === 'footer';
+  const headingNode = isChrome
+    ? undefined
+    : ['h1', 'h2', 'h3', 'h4']
+        .map((tag) => descendants.find((d) => d.tag === tag && d.text))
+        .find(Boolean);
+
+  // The eyebrow is the small, often uppercase label sitting above the
+  // heading — a distinct design element that reads wrong if folded into body.
+  const eyebrow = descendants.find(
+    (d) =>
+      d.text &&
+      headingNode !== undefined &&
+      d.box[1] < headingNode.box[1] &&
+      d.text.length < 60 &&
+      (d.styles.textTransform === 'uppercase' ||
+        (parseFloat(d.styles.fontSize) || 16) < 15),
+  );
+
+  const paragraphs = descendants.filter(
+    (d) => d.text && d.text.length > 24 && d !== headingNode && d !== eyebrow,
+  );
+
+  // Content already reported inside repeat items would otherwise appear twice.
+  const repeatText = new Set(repeat?.items.flatMap((item) => item.lines) ?? []);
+  const bodyText = paragraphs
+    .map((p) => p.text)
+    .filter((line) => !repeatText.has(line))
+    .slice(0, 8);
+
+  const ctas = descendants
+    .filter(isButtonLike)
+    .filter((d) => d.subtreeText.trim().length > 0 && !repeatText.has(d.subtreeText))
+    .slice(0, 6)
+    .map(describeCta);
+
+  const navLinks =
+    kind === 'nav' || kind === 'footer'
+      ? descendants
+          .filter((d) => d.tag === 'a' && d.subtreeText.trim())
+          .slice(0, 40)
+          .map((d) => ({ label: d.subtreeText.slice(0, 40), href: d.href }))
+      : [];
+
+  const images = descendants
+    .filter((d) => d.img?.src)
+    .slice(0, 20)
+    .map(classifyImage)
+    // Shape alone cannot tell a customer logo from a photo, but a logo cloud
+    // says outright what its images are — and these are exactly the assets a
+    // rebuild must not reuse.
+    .map((image) =>
+      kind === 'logo-cloud' ? { ...image, role: 'logo' as const, isBrandAsset: true } : image,
+    );
+
+  const notes: string[] = [];
+  if (node.styles.position === 'sticky' || node.styles.position === 'fixed') {
+    notes.push(`Pinned to the viewport (position: ${node.styles.position}).`);
+  }
+  if (node.styles.backdropFilter && node.styles.backdropFilter !== 'none') {
+    notes.push(`Backdrop filter: ${node.styles.backdropFilter}.`);
+  }
+  if (node.styles.backgroundImage.includes('gradient')) {
+    notes.push(`Background gradient: ${node.styles.backgroundImage.slice(0, 160)}.`);
+  }
+  if (repeat) {
+    notes.push(
+      `${repeat.count} repeating items in ${repeat.columns} column(s) — emit one ${repeat.componentName} and map over the data.`,
+    );
+  }
+
+  const subheadingNode = paragraphs.find(
+    (p) => headingNode !== undefined && p.box[1] >= headingNode.box[1],
+  );
+
+  return {
+    id: ctx.id ?? `section-${ctx.order + 1}-${kind}`,
+    kind,
+    label: LABELS[kind],
+    order: ctx.order,
+    selector: node.sel,
+    box: node.box,
+    background: node.styles.backgroundColor,
+    backgroundImage:
+      node.styles.backgroundImage === 'none' ? '' : node.styles.backgroundImage.slice(0, 300),
+    textColor: node.styles.color,
+    layout: buildLayout(layoutContainer, tree, node),
+    eyebrow: eyebrow?.text ?? '',
+    heading: headingNode?.text ?? '',
+    headingLevel: headingNode ? Number(headingNode.tag.slice(1)) || 0 : 0,
+    subheading: subheadingNode && subheadingNode.text !== bodyText[0] ? subheadingNode.text : bodyText[0] ?? '',
+    bodyText,
+    ctas,
+    navLinks,
+    images,
+    repeat,
+    responsive: {},
+    notes,
+  };
+}
+
 export function buildSections(harvest: HarvestResult): SectionSpec[] {
   const tree = new NodeTree(harvest.nodes);
   const { nodes: candidates, wholePage } = collectCandidates(tree, harvest.viewport.width);
 
-  return candidates.map((node, order) => {
-    const descendants = tree.descendants(node.i);
-    const text = node.subtreeText;
-
-    const layoutContainer = findLayoutContainer(tree, node.i);
-    const provisionalRepeat = detectRepeat(tree, layoutContainer.i, 'Item');
-    const repeatIsImages =
-      provisionalRepeat !== undefined &&
-      provisionalRepeat.items.filter((item) => item.image).length >= provisionalRepeat.count - 1;
-
-    // A whole page standing in as one section is an article, not a hero — the
-    // <h1> here is the document title, not a landing-page headline.
-    const kind: SectionKind = wholePage
-      ? 'content'
-      : classify({
-          node,
-          tree,
-          descendants,
-          text,
-          order,
-          total: candidates.length,
-          hasH1: descendants.some((d) => d.tag === 'h1' && d.text),
-          repeatCount: provisionalRepeat?.count ?? 0,
-          repeatIsImages,
-        });
-
-    // Nav and footer link lists are not "components"; naming them as such adds
-    // a meaningless <NavItem> to the emitted code.
-    const repeat =
-      kind === 'nav' || kind === 'footer'
-        ? undefined
-        : provisionalRepeat
-          ? { ...provisionalRepeat, componentName: COMPONENT_NAMES[kind] ?? 'Item' }
-          : undefined;
-
-    const isChrome = kind === 'nav' || kind === 'footer';
-    const headingNode = isChrome
-      ? undefined
-      : ['h1', 'h2', 'h3', 'h4']
-          .map((tag) => descendants.find((d) => d.tag === tag && d.text))
-          .find(Boolean);
-
-    // The eyebrow is the small, often uppercase label sitting above the
-    // heading — a distinct design element that reads wrong if folded into body.
-    const eyebrow = descendants.find(
-      (d) =>
-        d.text &&
-        headingNode !== undefined &&
-        d.box[1] < headingNode.box[1] &&
-        d.text.length < 60 &&
-        (d.styles.textTransform === 'uppercase' ||
-          (parseFloat(d.styles.fontSize) || 16) < 15),
-    );
-
-    const paragraphs = descendants.filter(
-      (d) => d.text && d.text.length > 24 && d !== headingNode && d !== eyebrow,
-    );
-
-    // Content already reported inside repeat items would otherwise appear twice.
-    const repeatText = new Set(repeat?.items.flatMap((item) => item.lines) ?? []);
-    const bodyText = paragraphs
-      .map((p) => p.text)
-      .filter((line) => !repeatText.has(line))
-      .slice(0, 8);
-
-    const ctas = descendants
-      .filter(isButtonLike)
-      .filter((d) => d.subtreeText.trim().length > 0 && !repeatText.has(d.subtreeText))
-      .slice(0, 6)
-      .map(describeCta);
-
-    const navLinks =
-      kind === 'nav' || kind === 'footer'
-        ? descendants
-            .filter((d) => d.tag === 'a' && d.subtreeText.trim())
-            .slice(0, 40)
-            .map((d) => ({ label: d.subtreeText.slice(0, 40), href: d.href }))
-        : [];
-
-    const images = descendants
-      .filter((d) => d.img?.src)
-      .slice(0, 20)
-      .map(classifyImage)
-      // Shape alone cannot tell a customer logo from a photo, but a logo cloud
-      // says outright what its images are — and these are exactly the assets a
-      // rebuild must not reuse.
-      .map((image) =>
-        kind === 'logo-cloud' ? { ...image, role: 'logo' as const, isBrandAsset: true } : image,
-      );
-
-    const notes: string[] = [];
-    if (node.styles.position === 'sticky' || node.styles.position === 'fixed') {
-      notes.push(`Pinned to the viewport (position: ${node.styles.position}).`);
-    }
-    if (node.styles.backdropFilter && node.styles.backdropFilter !== 'none') {
-      notes.push(`Backdrop filter: ${node.styles.backdropFilter}.`);
-    }
-    if (node.styles.backgroundImage.includes('gradient')) {
-      notes.push(`Background gradient: ${node.styles.backgroundImage.slice(0, 160)}.`);
-    }
-    if (repeat) {
-      notes.push(
-        `${repeat.count} repeating items in ${repeat.columns} column(s) — emit one ${repeat.componentName} and map over the data.`,
-      );
-    }
-
-    const subheadingNode = paragraphs.find(
-      (p) => headingNode !== undefined && p.box[1] >= headingNode.box[1],
-    );
-
-    return {
-      id: `section-${order + 1}-${kind}`,
-      kind,
-      label: LABELS[kind],
+  return candidates.map((node, order) =>
+    buildSectionSpec(tree, node, {
       order,
-      selector: node.sel,
-      box: node.box,
-      background: node.styles.backgroundColor,
-      backgroundImage:
-        node.styles.backgroundImage === 'none' ? '' : node.styles.backgroundImage.slice(0, 300),
-      textColor: node.styles.color,
-      layout: buildLayout(layoutContainer, tree, node),
-      eyebrow: eyebrow?.text ?? '',
-      heading: headingNode?.text ?? '',
-      headingLevel: headingNode ? Number(headingNode.tag.slice(1)) || 0 : 0,
-      subheading: subheadingNode && subheadingNode.text !== bodyText[0] ? subheadingNode.text : bodyText[0] ?? '',
-      bodyText,
-      ctas,
-      navLinks,
-      images,
-      repeat,
-      responsive: {},
-      notes,
-    };
-  });
+      total: candidates.length,
+      forceKind: wholePage ? 'content' : undefined,
+    }),
+  );
 }

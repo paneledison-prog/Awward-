@@ -14,6 +14,21 @@ import { applyMode } from './content';
  *  the archive knows what each file is before opening any of them. */
 export type BundleFile = Pick<EmittedFile, 'path' | 'description'>;
 
+/**
+ * What this brief describes. A component brief is the same document with a
+ * different subject — one section instead of eight, and a screenshot that shows
+ * the page it was cut from rather than the thing being built.
+ */
+export interface BriefSubject {
+  kind: 'page' | 'component';
+  /** The selector that scoped the extraction. */
+  selector?: string;
+  /** Where the component sits in the page: [x, y, width, height]. */
+  box?: [number, number, number, number];
+}
+
+const PAGE: BriefSubject = { kind: 'page' };
+
 /** Pipes and newlines break markdown tables; nothing else needs escaping. */
 const cell = (value: string | number | null | undefined): string =>
   String(value ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ').trim() || '—';
@@ -50,6 +65,7 @@ function bundleSection(
   assets: AssetManifest,
   files: BundleFile[],
   mode: ContentMode,
+  subject: BriefSubject,
 ): string {
   const shots = Object.entries(assets.screenshots) as [ViewportLabel, string][];
 
@@ -57,8 +73,13 @@ function bundleSection(
     '## 0. What you have been given',
     '',
     'This brief is one file in a **DesignDNA extraction bundle** — a ZIP produced by',
-    `rendering ${page.finalUrl} in a real browser and measuring it. If you were handed`,
-    'the archive, unzip it first; every path below is relative to its root.',
+    subject.kind === 'component'
+      ? `rendering ${page.finalUrl} in a real browser and measuring the element`
+      : `rendering ${page.finalUrl} in a real browser and measuring it. If you were handed`,
+    subject.kind === 'component'
+      ? `\`${subject.selector}\` inside it. If you were handed the archive, unzip it first;`
+      : 'the archive, unzip it first; every path below is relative to its root.',
+    ...(subject.kind === 'component' ? ['every path below is relative to its root.'] : []),
     '',
     '```',
     'extraction.zip',
@@ -333,7 +354,7 @@ function sectionDetail(section: SectionSpec, index: number, mode: ContentMode): 
   return out.join('\n');
 }
 
-function assetsSection(assets: AssetManifest, documentHeight: number): string {
+function assetsSection(assets: AssetManifest, documentHeight: number, subject: BriefSubject): string {
   const out: string[] = ['## 4. Assets', ''];
 
   const brand = assets.images.filter((i) => i.isBrandAsset);
@@ -371,7 +392,7 @@ function assetsSection(assets: AssetManifest, documentHeight: number): string {
     '',
   );
 
-  out.push(screenshotsSection(assets, documentHeight));
+  out.push(screenshotsSection(assets, documentHeight, subject));
 
   return out.join('\n');
 }
@@ -384,7 +405,11 @@ function assetsSection(assets: AssetManifest, documentHeight: number): string {
  * in this brief, and therefore the one artifact that can settle a question the
  * measurements leave open — what the page actually looks like.
  */
-function screenshotsSection(assets: AssetManifest, documentHeight: number): string {
+function screenshotsSection(
+  assets: AssetManifest,
+  documentHeight: number,
+  subject: BriefSubject,
+): string {
   const shots = Object.entries(assets.screenshots) as [ViewportLabel, string][];
 
   if (!shots.length) {
@@ -416,6 +441,14 @@ function screenshotsSection(assets: AssetManifest, documentHeight: number): stri
       ]),
     ),
     '',
+    ...(subject.kind === 'component' && subject.box
+      ? [
+          `**These show the whole page, not just the component.** It sits at x ${subject.box[0]}, `
+            + `y ${subject.box[1]}, ${subject.box[2]}×${subject.box[3]}px — look there, and use the `
+            + 'surroundings to judge how much space it is given.',
+          '',
+        ]
+      : []),
     '**Use them for:**',
     '',
     '- Checking section order and vertical rhythm against §2 before you write any markup.',
@@ -439,6 +472,7 @@ function buildInstructions(
   sections: SectionSpec[],
   mode: ContentMode,
   assets: AssetManifest,
+  subject: BriefSubject,
 ): string {
   const shots = Object.keys(assets.screenshots) as ViewportLabel[];
   const components = sections.filter((s) => s.repeat).map((s) => s.repeat!.componentName);
@@ -449,14 +483,18 @@ function buildInstructions(
     '## 5. Build instructions',
     '',
     shots.length
-      ? `0. Open \`screenshots/${shots[0]}.jpg\` and look at the page before writing anything. Everything below describes what is in that image.`
+      ? `0. Open \`screenshots/${shots[0]}.jpg\` and look at ${subject.kind === 'component' ? 'the element §4 locates in it' : 'the page'} before writing anything.`
       : '0. No screenshots were captured for this run; the measurements below are the only record of the page.',
     '1. Start from the design tokens. Put the color, type, spacing, radius and shadow values',
-    '   into your theme configuration *before* writing any markup — every section below',
+    '   into your theme configuration *before* writing any markup — everything below',
     '   references them by name.',
     `2. Load the fonts first${bodyFont ? ` (body: **${bodyFont.primary}**${displayFont && displayFont !== bodyFont ? `, display: **${displayFont.primary}**` : ''})` : ''}. A font swap changes every measurement in this brief.`,
-    `3. Build a page shell with a centred container at ${design.container.maxWidth ? `\`${design.container.maxWidth}px\`` : 'full width'}.`,
-    `4. Build the ${sections.length} sections in the order listed in §2.`,
+    subject.kind === 'component'
+      ? '3. Build the component as a standalone, self-contained piece: no page shell, no outer container, no fixed width. It has to drop into a layout that is not this page.'
+      : `3. Build a page shell with a centred container at ${design.container.maxWidth ? `\`${design.container.maxWidth}px\`` : 'full width'}.`,
+    subject.kind === 'component'
+      ? '4. Build it from §3, and take the props from what varies there — every literal that could differ between two instances is a prop, not a hardcoded value.'
+      : `4. Build the ${sections.length} sections in the order listed in §2.`,
     components.length
       ? `5. Extract these repeating pieces as components: ${[...new Set(components)].map((c) => `\`<${c} />\``).join(', ')}. Render each from a data array — do not hand-write repeated markup.`
       : '5. No repeating components were detected; build each section directly.',
@@ -467,12 +505,18 @@ function buildInstructions(
     '- Every color, font size and spacing value comes from the token set, not a literal.',
     ...(shots.length
       ? [
-          `- Your build at ${VIEWPORTS[shots[0]]?.width ?? '—'}px, screenshotted and placed beside \`screenshots/${shots[0]}.jpg\`, matches it in section order, proportion and density.`,
+          subject.kind === 'component'
+            ? `- Your build, screenshotted beside the element in \`screenshots/${shots[0]}.jpg\`, matches it in proportion, density and weight.`
+            : `- Your build at ${VIEWPORTS[shots[0]]?.width ?? '—'}px, screenshotted and placed beside \`screenshots/${shots[0]}.jpg\`, matches it in section order, proportion and density.`,
         ]
       : []),
-    '- Section order and vertical rhythm match §2.',
+    subject.kind === 'component'
+      ? '- The component renders correctly at a width it was not measured at; nothing depends on the page it came from.'
+      : '- Section order and vertical rhythm match §2.',
     '- Repeating groups render from data, with the item count in §3.',
-    '- The page reflows correctly at each declared breakpoint.',
+    subject.kind === 'component'
+      ? '- The component reflows correctly at each declared breakpoint.'
+      : '- The page reflows correctly at each declared breakpoint.',
     mode === 'verbatim'
       ? '- Copy matches the text in §3 exactly.'
       : '- Copy uses the placeholder text in §3; replace it with your own.',
@@ -493,17 +537,30 @@ export function emitAgentPrompt(
   assets: AssetManifest,
   mode: ContentMode,
   bundle: BundleFile[],
+  subject: BriefSubject = PAGE,
 ): EmittedFile {
   const parts: string[] = [];
 
+  const component = subject.kind === 'component' ? sections[0] : undefined;
+
   parts.push(
-    `# Build brief: ${page.title || page.finalUrl}`,
+    component
+      ? `# Build brief: ${component.label} component — ${page.title || page.finalUrl}`
+      : `# Build brief: ${page.title || page.finalUrl}`,
     '',
-    'Rebuild the page described below. Every value in this brief was measured from the',
-    'rendered page — computed styles, geometry and text — so treat the numbers as exact',
-    'rather than approximate.',
+    component
+      ? 'Rebuild the single component described below — not the page it came from. Every'
+      : 'Rebuild the page described below. Every value in this brief was measured from the',
+    component
+      ? 'value here was measured from the rendered element — computed styles, geometry and'
+      : 'rendered page — computed styles, geometry and text — so treat the numbers as exact',
+    component
+      ? 'text — so treat the numbers as exact rather than approximate.'
+      : 'rather than approximate.',
     '',
-    `**Source:** ${page.finalUrl}  ·  **Extracted:** ${page.extractedAt}  ·  **Sections:** ${sections.length}  ·  **Content:** ${mode}`,
+    component
+      ? `**Source:** ${page.finalUrl}  ·  **Element:** \`${subject.selector ?? component.selector}\`  ·  **Extracted:** ${page.extractedAt}  ·  **Content:** ${mode}`
+      : `**Source:** ${page.finalUrl}  ·  **Extracted:** ${page.extractedAt}  ·  **Sections:** ${sections.length}  ·  **Content:** ${mode}`,
     '',
   );
 
@@ -512,34 +569,59 @@ export function emitAgentPrompt(
     parts.push('> **Capture caveats**', '>', ...page.warnings.map((w) => `> - ${w}`), '');
   }
 
-  parts.push(bundleSection(page, assets, bundle, mode));
+  parts.push(bundleSection(page, assets, bundle, mode, subject));
   parts.push(designSystemSection(design));
 
-  parts.push(
-    '## 2. Page structure',
-    '',
-    table(
-      ['#', 'Section', 'Kind', 'Height', 'Columns', 'Repeats'],
-      sections.map((s, i) => [
-        i + 1,
-        s.heading || s.label,
-        s.kind,
-        `${s.box[3]}px`,
-        s.layout.columns,
-        s.repeat ? `${s.repeat.count}× ${s.repeat.componentName}` : '',
-      ]),
-    ),
-    '',
-    '## 3. Sections',
-    '',
-  );
+  if (component) {
+    parts.push(
+      '## 2. The component',
+      '',
+      table(
+        ['Element', 'Reads as', 'Size on screen', 'Columns', 'Repeats'],
+        [
+          [
+            `\`${subject.selector ?? component.selector}\``,
+            component.kind,
+            `${component.box[2]}×${component.box[3]}px`,
+            component.layout.columns,
+            component.repeat ? `${component.repeat.count}× ${component.repeat.componentName}` : '',
+          ],
+        ],
+      ),
+      '',
+      'It was measured where it sits on the page, so that width is the width it renders at',
+      'there — not a width it was designed to fill. Build it to fit its container.',
+      '',
+      '## 3. The component in detail',
+      '',
+    );
+  } else {
+    parts.push(
+      '## 2. Page structure',
+      '',
+      table(
+        ['#', 'Section', 'Kind', 'Height', 'Columns', 'Repeats'],
+        sections.map((s, i) => [
+          i + 1,
+          s.heading || s.label,
+          s.kind,
+          `${s.box[3]}px`,
+          s.layout.columns,
+          s.repeat ? `${s.repeat.count}× ${s.repeat.componentName}` : '',
+        ]),
+      ),
+      '',
+      '## 3. Sections',
+      '',
+    );
+  }
 
   for (const [index, section] of sections.entries()) {
     parts.push(sectionDetail(section, index, mode));
   }
 
-  parts.push(assetsSection(assets, page.documentHeight));
-  parts.push(buildInstructions(design, sections, mode, assets));
+  parts.push(assetsSection(assets, page.documentHeight, subject));
+  parts.push(buildInstructions(design, sections, mode, assets, subject));
 
   return {
     path: 'AGENT_PROMPT.md',

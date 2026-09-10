@@ -10,6 +10,122 @@ function say(text, kind = '') {
 
 let tab;
 let resultUrl = '';
+let port;
+
+/**
+ * One long-lived port for the whole popup session, rather than sendMessage.
+ *
+ * A capture runs for tens of seconds and a popup closes the moment it loses
+ * focus. A listener that answers that late logs "the message channel closed
+ * before a response was received" for every message in flight — noise that
+ * looks like a failure. A port reports its own disconnect, so the worker
+ * carries on and posts nothing into a channel that has gone.
+ */
+function worker() {
+  if (port) return port;
+
+  port = chrome.runtime.connect({ name: 'designdna' });
+  port.onMessage.addListener(async (msg) => {
+    if (msg.type === 'progress') return say(msg.text);
+    if (msg.type === 'requests') return renderRequests(msg.requests);
+
+    if (msg.type === 'done') {
+      resultUrl = msg.url;
+      summarize($('shot').value, $('instance').value.trim());
+      $('setup').hidden = true;
+      $('requests').hidden = true;
+      $('done').hidden = false;
+      return;
+    }
+
+    if (msg.type === 'error') {
+      say(msg.error, 'err');
+      $('go').disabled = false;
+    }
+  });
+
+  port.onDisconnect.addListener(() => {
+    port = undefined;
+    $('go').disabled = false;
+  });
+
+  return port;
+}
+
+/**
+ * Render what an agent has queued.
+ *
+ * These are requests, not instructions: nothing opens a tab or reads a page
+ * until Capture is clicked here.
+ */
+function renderRequests(requests) {
+  const list = $('requestList');
+  list.textContent = '';
+  $('requests').hidden = !requests?.length;
+  if (!requests?.length) return;
+
+  for (const request of requests) {
+    const card = document.createElement('div');
+    card.className = 'request';
+
+    const url = document.createElement('div');
+    url.className = 'request-url';
+    url.textContent = request.url;
+    card.append(url);
+
+    if (request.selector) {
+      const selector = document.createElement('div');
+      selector.className = 'request-selector';
+      selector.textContent = request.selector;
+      card.append(selector);
+    }
+
+    if (request.note) {
+      const note = document.createElement('p');
+      note.className = 'request-note';
+      note.textContent = request.note;
+      card.append(note);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+
+    const capture = document.createElement('button');
+    capture.className = 'primary';
+    capture.textContent = 'Capture';
+    capture.addEventListener('click', () => startCapture(request, capture));
+
+    const dismiss = document.createElement('button');
+    dismiss.className = 'secondary';
+    dismiss.textContent = 'Dismiss';
+    dismiss.addEventListener('click', () => {
+      worker().postMessage({ type: 'decline', id: request.id });
+    });
+
+    actions.append(capture, dismiss);
+    card.append(actions);
+    list.append(card);
+  }
+}
+
+/** Host permission for that one origin is asked for at the click, not up front. */
+async function startCapture(request, button) {
+  button.disabled = true;
+  try {
+    const origin = new URL(request.url).origin + '/*';
+    const granted = await chrome.permissions.request({ origins: [origin] });
+    if (!granted) {
+      button.disabled = false;
+      return say(`Permission for ${new URL(request.url).host} was declined.`, 'err');
+    }
+  } catch {
+    button.disabled = false;
+    return say('That request has an unusable URL.', 'err');
+  }
+
+  say('Opening the page…');
+  worker().postMessage({ type: 'fulfill', request, shotMode: $('shot').value });
+}
 
 function showSite(t) {
   let host = '';
@@ -105,6 +221,8 @@ for (const id of ['version', 'versionDone']) {
 
   const { shotMode = 'full' } = await chrome.storage.sync.get('shotMode');
   $('shot').value = shotMode;
+
+  if (instance) worker().postMessage({ type: 'requests' });
 })();
 
 $('explore').addEventListener('click', async () => {
@@ -139,33 +257,5 @@ $('go').addEventListener('click', async () => {
   $('go').disabled = true;
   say('Measuring…');
 
-  // A port, not sendMessage: this runs for tens of seconds and the popup closes
-  // as soon as it loses focus. The port simply disconnects, and the worker
-  // carries on rather than logging a channel error for every progress update.
-  const port = chrome.runtime.connect({ name: 'designdna' });
-
-  port.onMessage.addListener((msg) => {
-    if (msg.type === 'progress') return say(msg.text);
-
-    if (msg.type === 'done') {
-      // The results tab is opened by Explore, not automatically: the summary is
-      // the only place the popup can report what it did before it closes.
-      resultUrl = msg.url;
-      summarize(shotMode, instance);
-      $('setup').hidden = true;
-      $('done').hidden = false;
-      return;
-    }
-
-    if (msg.type === 'error') {
-      say(msg.error, 'err');
-      $('go').disabled = false;
-    }
-  });
-
-  port.onDisconnect.addListener(() => {
-    $('go').disabled = false;
-  });
-
-  port.postMessage({ type: 'extract', tabId: tab.id, instance, shotMode });
+  worker().postMessage({ type: 'extract', tabId: tab.id, instance, shotMode });
 });

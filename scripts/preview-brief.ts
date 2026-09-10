@@ -17,6 +17,7 @@ import {
   buildRadii,
   buildShadows,
 } from '../lib/extract/effects';
+import { buildComponentSection, sliceSubtree } from '../lib/extract/component';
 import { buildSections } from '../lib/extract/sections';
 import { buildAssetManifest } from '../lib/extract/assets';
 import { emitAgentPrompt, emitCompactPrompt } from '../lib/emit/prompt';
@@ -72,4 +73,23 @@ const bundle = [
 
 writeFileSync('/tmp/brief.md', emitAgentPrompt(page, design, sections, assets, 'verbatim', bundle).contents);
 writeFileSync('/tmp/brief-compact.md', emitCompactPrompt(page, design, sections, 'verbatim', assets).contents);
-console.log('wrote /tmp/brief.md and /tmp/brief-compact.md');
+
+// The component brief, from the same fixture: slice one section out and render
+// it as a scoped extraction would.
+const pricing = sections.find((s) => s.kind === 'pricing') ?? sections[0];
+const pricingNode = harvest.nodes.find((n) => n.sel === pricing.selector)!;
+const sliced = sliceSubtree(harvest, pricingNode.i);
+sliced.root = { ...sliced.root!, selector: '.pricing' };
+const componentSpec = buildComponentSection(sliced);
+const componentDesign = { ...design, palette: buildPalette(sliced.nodes) };
+
+writeFileSync(
+  '/tmp/brief-component.md',
+  emitAgentPrompt(page, componentDesign, [componentSpec], assets, 'verbatim', bundle, {
+    kind: 'component',
+    selector: '.pricing',
+    box: componentSpec.box,
+  }).contents,
+);
+
+console.log('wrote /tmp/brief.md, /tmp/brief-compact.md and /tmp/brief-component.md');

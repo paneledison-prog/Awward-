@@ -14,6 +14,7 @@
     "smoke": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/try-all-fixtures.js",
     "record-fixture": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/try-harvest.js",
     "preview:brief": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/preview-brief.js",
+    "seed:result": "tsc -p tsconfig.scripts.json && node .dev-build/scripts/seed-result.js",
     "dev:lan": "next dev -H 0.0.0.0 -p ${PORT:-3000}",
     "start:lan": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "smoke:container": "node scripts/smoke-container.mjs",

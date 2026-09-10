@@ -1,7 +1,9 @@
 /* GENERATED — do not edit. Run `npm run build:extension`. */
 /* Source: lib/extract/harvest.ts */
 (() => {
-  const harvestFn = function inPageHarvest(maxNodes) {
+  const harvestFn = function inPageHarvest(options) {
+    const maxNodes = options.maxNodes;
+    const rootSelector = options.rootSelector ?? '';
     /* ---------------------------------------------------------------- */
     /* Setup                                                             */
     /* ---------------------------------------------------------------- */
@@ -197,9 +199,17 @@
         for (const child of Array.from(el.children))
             visit(child, index, depth + 1);
     }
-    const root = document.body;
+    /*
+     * Where the walk starts.
+     *
+     * A selector that matches nothing must be reported, never quietly widened to
+     * the body: an agent that asked for `.pricing-card` and received the whole
+     * page would describe the wrong thing with complete confidence.
+     */
+    const root = rootSelector ? document.querySelector(rootSelector) : document.body;
     if (root)
         visit(root, -1, 0);
+    const rootRect = root?.getBoundingClientRect();
     /* ---------------------------------------------------------------- */
     /* Stylesheets: media queries, keyframes, :root variables            */
     /* ---------------------------------------------------------------- */
@@ -284,6 +294,18 @@
     const iconHref = document.querySelector('link[rel~="icon"]')?.href ?? '';
     return {
         finalUrl: location.href,
+        root: {
+            selector: rootSelector,
+            found: Boolean(root),
+            box: rootRect
+                ? [
+                    Math.round(rootRect.left + scrollX),
+                    Math.round(rootRect.top + scrollY),
+                    Math.round(rootRect.width),
+                    Math.round(rootRect.height),
+                ]
+                : [0, 0, 0, 0],
+        },
         title: collapse(document.title, 200),
         description: metaContent('meta[name="description"]').slice(0, 400),
         lang: document.documentElement.lang || '',
@@ -309,7 +331,12 @@
     };
 };
 
-  const raw = harvestFn(3000);
+  // A selector is planted on the window by the worker just before this runs;
+  // a static file injected with `files:` cannot take arguments.
+  const rootSelector = globalThis.__designdna_root || '';
+  delete globalThis.__designdna_root;
+
+  const raw = harvestFn({ maxNodes: 3000, rootSelector });
   const w = window.innerWidth;
   const label = w >= 1200 ? 'desktop' : w >= 700 ? 'tablet' : 'mobile';
 

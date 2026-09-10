@@ -16,7 +16,12 @@ const body = `${banner}
 (() => {
   const harvestFn = ${inPageHarvest.toString()};
 
-  const raw = harvestFn(3000);
+  // A selector is planted on the window by the worker just before this runs;
+  // a static file injected with \`files:\` cannot take arguments.
+  const rootSelector = globalThis.__designdna_root || '';
+  delete globalThis.__designdna_root;
+
+  const raw = harvestFn({ maxNodes: 3000, rootSelector });
   const w = window.innerWidth;
   const label = w >= 1200 ? 'desktop' : w >= 700 ? 'tablet' : 'mobile';
 

@@ -12,7 +12,9 @@ import type { HarvestResult, ViewportConfig } from '../types';
  * function over that array, so the expensive part (rendering) happens once and
  * the analysis stays unit-testable without a browser.
  */
-export function inPageHarvest(maxNodes: number) {
+export function inPageHarvest(options: { maxNodes: number; rootSelector?: string }) {
+  const maxNodes = options.maxNodes;
+  const rootSelector = options.rootSelector ?? '';
   /* ---------------------------------------------------------------- */
   /* Setup                                                             */
   /* ---------------------------------------------------------------- */
@@ -228,8 +230,17 @@ export function inPageHarvest(maxNodes: number) {
     for (const child of Array.from(el.children)) visit(child, index, depth + 1);
   }
 
-  const root = document.body;
+  /*
+   * Where the walk starts.
+   *
+   * A selector that matches nothing must be reported, never quietly widened to
+   * the body: an agent that asked for `.pricing-card` and received the whole
+   * page would describe the wrong thing with complete confidence.
+   */
+  const root: Element | null = rootSelector ? document.querySelector(rootSelector) : document.body;
   if (root) visit(root, -1, 0);
+
+  const rootRect = root?.getBoundingClientRect();
 
   /* ---------------------------------------------------------------- */
   /* Stylesheets: media queries, keyframes, :root variables            */
@@ -317,6 +328,18 @@ export function inPageHarvest(maxNodes: number) {
 
   return {
     finalUrl: location.href,
+    root: {
+      selector: rootSelector,
+      found: Boolean(root),
+      box: rootRect
+        ? ([
+            Math.round(rootRect.left + scrollX),
+            Math.round(rootRect.top + scrollY),
+            Math.round(rootRect.width),
+            Math.round(rootRect.height),
+          ] as [number, number, number, number])
+        : ([0, 0, 0, 0] as [number, number, number, number]),
+    },
     title: collapse(document.title, 200),
     description: metaContent('meta[name="description"]').slice(0, 400),
     lang: document.documentElement.lang || '',
@@ -347,13 +370,15 @@ export function inPageHarvest(maxNodes: number) {
 
 const MAX_NODES = 3000;
 
-/** Run the harvest inside `page` and tag the result with its viewport. */
+/** Run the harvest inside `page` and tag the result with its viewport.
+ *  `rootSelector` scopes the walk to one element; omitted, it walks the body. */
 export async function harvest(
   page: Page,
   requestedUrl: string,
   viewport: ViewportConfig,
+  rootSelector?: string,
 ): Promise<HarvestResult> {
-  const raw = await page.evaluate(inPageHarvest, MAX_NODES);
+  const raw = await page.evaluate(inPageHarvest, { maxNodes: MAX_NODES, rootSelector });
   // The in-page function builds plain records because it cannot import our
   // types across the CDP JSON boundary; its shape is asserted here instead.
   return {

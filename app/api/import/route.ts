@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createJob, emitProgress, failJob, finishJob } from '@/lib/jobs';
+import { createJob, emitProgress, failJob, finishJob, getJob } from '@/lib/jobs';
+import { getRequest, updateRequest } from '@/lib/requests';
 import { analyze } from '@/lib/extract';
+import { CORS } from '@/lib/cors';
+import { findNodeIndex, sliceSubtree } from '@/lib/extract/component';
 import { requestOrigin } from '@/lib/request-origin';
 import { screenshotName, screenshotUrl, writeScreenshot } from '@/lib/screenshots';
 import type {
@@ -19,19 +22,6 @@ const MAX_BODY_BYTES = 32 * 1024 * 1024;
 const MAX_SCREENSHOT_BYTES = 12 * 1024 * 1024;
 
 const VIEWPORT_LABELS: ViewportLabel[] = ['desktop', 'tablet', 'mobile'];
-
-/**
- * Accept a harvest gathered in someone else's browser.
- *
- * CORS is open because that is the entire point: the script runs on whatever
- * origin the person is looking at and posts here. The endpoint takes data and
- * returns an id — no credentials are read, and nothing it returns is sensitive.
- */
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
 
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS });
@@ -67,6 +57,8 @@ export async function POST(request: Request) {
     network?: unknown;
     contentMode?: unknown;
     screenshots?: Record<string, string>;
+    /** Set when this capture answers a request an agent queued. */
+    requestId?: unknown;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -79,19 +71,51 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: invalid }, { status: 400, headers: CORS });
   }
 
-  const harvest = body.harvest as HarvestResult;
+  let harvest = body.harvest as HarvestResult;
   const network = (Array.isArray(body.network) ? body.network : []) as HarvestNetworkEntry[];
   const label: ViewportLabel = harvest.viewport.label ?? 'desktop';
 
-  const job = createJob({
-    url: harvest.finalUrl,
-    contentMode: body.contentMode === 'placeholder' ? 'placeholder' : 'verbatim',
-    viewports: [label],
-    emitReact: true,
-    emitHtml: true,
-  });
+  // A capture the extension performed for a queued agent request completes
+  // that agent's job rather than starting a new one it is not watching.
+  const requestId = typeof body.requestId === 'string' ? body.requestId : '';
+  const capture = requestId ? await getRequest(requestId) : undefined;
+  if (requestId && !capture) {
+    return NextResponse.json(
+      { error: `Unknown capture request ${requestId}.` },
+      { status: 404, headers: CORS },
+    );
+  }
+
+  const job =
+    (capture ? getJob(capture.jobId) : undefined) ??
+    createJob({
+      url: harvest.finalUrl,
+      selector: capture?.selector,
+      contentMode: body.contentMode === 'placeholder' ? 'placeholder' : 'verbatim',
+      viewports: [label],
+      emitReact: true,
+      emitHtml: true,
+    });
 
   const startedAt = Date.now();
+  const sliceWarnings: string[] = [];
+
+  // A capture for a request that named a selector should carry only that
+  // element. Newer extensions scope the harvest themselves; when one does not,
+  // cutting the subtree out here beats describing the whole page under the
+  // component's name — which is what an unscoped harvest would silently do.
+  if (capture?.selector && !harvest.root?.selector) {
+    const index = findNodeIndex(harvest, capture.selector);
+    if (index >= 0) {
+      harvest = sliceSubtree(harvest, index);
+      harvest.root = { ...harvest.root!, selector: capture.selector };
+    } else {
+      sliceWarnings.push(
+        `"${capture.selector}" matched nothing in this capture, so the whole page was analysed. ` +
+          `Update the extension, or check the selector.`,
+      );
+    }
+  }
 
   // Screenshots arrive as data URLs from the extension. Decoding them here
   // keeps them on the same disk the server-rendered captures use, so the UI,
@@ -128,6 +152,7 @@ export async function POST(request: Request) {
       ? ['No screenshot was captured. The browser extension can capture one; the console snippet cannot.']
       : []),
     ...shotWarnings,
+    ...sliceWarnings,
   ];
 
   void analyze({
@@ -145,9 +170,14 @@ export async function POST(request: Request) {
     startedAt,
     onProgress: (step, message, progress) => emitProgress(job.id, step, message, progress),
   })
-    .then((result) => finishJob(job.id, result))
-    .catch((error: unknown) => {
-      failJob(job.id, error instanceof Error ? error.message : String(error));
+    .then(async (result) => {
+      finishJob(job.id, result);
+      if (capture) await updateRequest(capture.id, { status: 'done', resultId: result.id });
+    })
+    .catch(async (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      failJob(job.id, message);
+      if (capture) await updateRequest(capture.id, { status: 'declined', message });
     });
 
   const origin = requestOrigin(request);

@@ -21,13 +21,25 @@ async function run(tabId, args, func) {
 }
 
 /** Harvest, from the generated file so it matches the server's implementation. */
-async function harvestPage(tabId) {
+async function harvestPage(tabId, selector) {
+  // harvest.js is injected as a file, which cannot take arguments, so the
+  // selector is planted on the page first and the file reads it once.
+  if (selector) {
+    await run(tabId, [selector], (value) => {
+      globalThis.__designdna_root = value;
+    });
+  }
+
   const [entry] = await chrome.scripting.executeScript({
     target: { tabId },
     world: 'MAIN',
     files: ['harvest.js'],
   });
   if (!entry?.result?.harvest) throw new Error('The page returned no measurements.');
+  const root = entry.result.harvest.root;
+  if (selector && root && !root.found) {
+    throw new Error(`Nothing on this page matches "${selector}".`);
+  }
   return entry.result;
 }
 
@@ -144,10 +156,10 @@ async function stitch(frames, metrics) {
   });
 }
 
-async function extract({ tabId, instance, shotMode, onProgress }) {
+async function extract({ tabId, instance, shotMode, selector, requestId, onProgress }) {
   progress = onProgress ?? (() => {});
-  progress('Measuring the page…');
-  const { harvest, network } = await harvestPage(tabId);
+  progress(selector ? `Measuring ${selector}…` : 'Measuring the page…');
+  const { harvest, network } = await harvestPage(tabId, selector);
 
   let screenshot;
   if (shotMode === 'viewport') {
@@ -164,6 +176,7 @@ async function extract({ tabId, instance, shotMode, onProgress }) {
     body: JSON.stringify({
       harvest,
       network,
+      requestId,
       screenshots: screenshot ? { [harvest.viewport.label]: screenshot } : undefined,
     }),
   });
@@ -173,10 +186,121 @@ async function extract({ tabId, instance, shotMode, onProgress }) {
   return data.url;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Captures an agent has asked for                                     */
+/* ------------------------------------------------------------------ */
+
+const POLL_ALARM = 'designdna-poll';
+
+async function instanceUrl() {
+  const { instance = '' } = await chrome.storage.sync.get('instance');
+  return instance.replace(/\/$/, '');
+}
+
+/** Pending requests, or an empty list whenever the instance is unreachable. */
+async function fetchRequests() {
+  const instance = await instanceUrl();
+  if (!instance) return [];
+
+  try {
+    const res = await fetch(`${instance}/api/extension/requests`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.requests) ? data.requests : [];
+  } catch {
+    // The instance sleeps when idle; a failed poll is normal, not an error.
+    return [];
+  }
+}
+
+/** The badge is the whole notification: a count, never an action. */
+async function refreshBadge() {
+  const requests = await fetchRequests();
+  await chrome.action.setBadgeText({ text: requests.length ? String(requests.length) : '' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#1a73e8' });
+  return requests;
+}
+
+async function answerRequest(id, action, message) {
+  const instance = await instanceUrl();
+  if (!instance) throw new Error('No DesignDNA instance is configured.');
+
+  const res = await fetch(`${instance}/api/extension/requests/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, message }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `Could not update the request (${res.status})`);
+  return data;
+}
+
+/** Open the page in its own tab and wait for it to finish loading. */
+function openTab(url) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.create({ url, active: true }, (tab) => {
+      if (!tab?.id) return reject(new Error('Could not open that page.'));
+
+      const done = (tabId, info) => {
+        if (tabId !== tab.id || info.status !== 'complete') return;
+        chrome.tabs.onUpdated.removeListener(done);
+        resolve(tab.id);
+      };
+      chrome.tabs.onUpdated.addListener(done);
+
+      // A page that never reports complete should not hang the capture; the
+      // harvest reads whatever has rendered by then.
+      setTimeout(() => {
+        chrome.tabs.onUpdated.removeListener(done);
+        resolve(tab.id);
+      }, 20000);
+    });
+  });
+}
+
+/**
+ * Perform one queued capture, after the person clicked Capture.
+ *
+ * Host permission for the target origin is requested at that click — the
+ * extension never holds standing access to every site.
+ */
+async function fulfill({ request, shotMode, onProgress }) {
+  progress = onProgress ?? (() => {});
+  const instance = await instanceUrl();
+
+  progress('Waiting for the page to load…');
+  const tabId = await openTab(request.url);
+  await answerRequest(request.id, 'claim');
+
+  // Let the page settle: a harvest of a half-rendered page measures a
+  // half-rendered page, confidently.
+  await sleep(2500);
+
+  const url = await extract({
+    tabId,
+    instance,
+    shotMode,
+    selector: request.selector || undefined,
+    requestId: request.id,
+    onProgress,
+  });
+
+  await refreshBadge();
+  return url;
+}
+
+chrome.alarms.create(POLL_ALARM, { periodInMinutes: 0.5 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === POLL_ALARM) void refreshBadge();
+});
+chrome.runtime.onStartup.addListener(() => void refreshBadge());
+chrome.runtime.onInstalled.addListener(() => void refreshBadge());
+
 // Exposed so the extraction can be driven directly in tests. A service worker
 // cannot receive its own runtime messages, so there is otherwise no way to
 // exercise this path without simulating a popup click.
-self.designdna = { extract, captureFullPage, captureViewport };
+self.designdna = { extract, captureFullPage, captureViewport, fetchRequests, fulfill };
 
 /**
  * A long-lived port rather than sendMessage/sendResponse.
@@ -206,13 +330,35 @@ chrome.runtime.onConnect.addListener((port) => {
   };
 
   port.onMessage.addListener(async (message) => {
-    if (message?.type !== 'extract') return;
     try {
-      const url = await extract({
-        ...message,
-        onProgress: (text) => send({ type: 'progress', text }),
-      });
-      send({ type: 'done', url });
+      if (message?.type === 'extract') {
+        const url = await extract({
+          ...message,
+          onProgress: (text) => send({ type: 'progress', text }),
+        });
+        send({ type: 'done', url });
+        return;
+      }
+
+      if (message?.type === 'requests') {
+        send({ type: 'requests', requests: await refreshBadge() });
+        return;
+      }
+
+      if (message?.type === 'fulfill') {
+        const url = await fulfill({
+          request: message.request,
+          shotMode: message.shotMode,
+          onProgress: (text) => send({ type: 'progress', text }),
+        });
+        send({ type: 'done', url });
+        return;
+      }
+
+      if (message?.type === 'decline') {
+        await answerRequest(message.id, 'decline', message.message);
+        send({ type: 'requests', requests: await refreshBadge() });
+      }
     } catch (error) {
       send({ type: 'error', error: String(error.message ?? error) });
     }

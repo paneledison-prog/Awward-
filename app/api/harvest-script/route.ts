@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const harvestFn = ${inPageHarvest.toString()};
 
   console.log('%cDesignDNA%c harvesting…', 'font-weight:bold;color:#34d399', '');
-  const raw = harvestFn(MAX_NODES);
+  const raw = harvestFn({ maxNodes: MAX_NODES, rootSelector: globalThis.__designdna_root || '' });
 
   const w = window.innerWidth;
   const label = w >= 1200 ? 'desktop' : w >= 700 ? 'tablet' : 'mobile';

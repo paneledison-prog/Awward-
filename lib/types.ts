@@ -144,6 +144,9 @@ export interface HarvestResult {
   lang: string;
   viewport: { width: number; height: number; label: ViewportLabel };
   documentHeight: number;
+  /** Where the walk started. `found: false` means the requested selector
+   *  matched nothing — the harvest is empty rather than the whole page. */
+  root?: { selector: string; found: boolean; box: [number, number, number, number] };
   nodes: HarvestNode[];
   /** Raw `@media` condition text from every reachable stylesheet. */
   mediaQueries: string[];
@@ -450,8 +453,33 @@ export interface AssetManifest {
 
 export type ContentMode = 'verbatim' | 'placeholder';
 
+/**
+ * A capture an agent asked a person's browser to perform, because the server's
+ * own renderer cannot reach the page.
+ */
+export interface CaptureRequest {
+  id: string;
+  url: string;
+  /** CSS selector for one element, when the agent wants a component. */
+  selector?: string;
+  /** Why the agent wants it — shown to the person deciding. */
+  note?: string;
+  viewport?: ViewportLabel;
+  /** The extraction job the agent polls; the capture completes it. */
+  jobId: string;
+  status: 'pending' | 'claimed' | 'done' | 'declined' | 'expired';
+  createdAt: number;
+  updatedAt: number;
+  resultId?: string;
+  /** Why it was declined, or how it failed. */
+  message?: string;
+}
+
 export interface ExtractOptions {
   url: string;
+  /** CSS selector scoping the extraction to one element. Omitted, the whole
+   *  page is extracted. */
+  selector?: string;
   contentMode: ContentMode;
   viewports: ViewportLabel[];
   /** Emit React/Tailwind component files. */

@@ -24,24 +24,14 @@ import type {
   ViewportLabel,
 } from '../types';
 import { buildAssetManifest } from './assets';
+import { buildDesignSystem } from './design';
 import { challengeMessage, detectChallenge } from './challenge';
-import { buildPalette } from './colors';
+import { buildComponentSection } from './component';
 import { columnCount, findLayoutContainer } from './components';
-import {
-  buildBorderWidths,
-  buildBreakpoints,
-  buildContainer,
-  buildMotion,
-  buildRadii,
-  buildShadows,
-  readCssVariables,
-} from './effects';
 import { harvest } from './harvest';
 import { buildSections } from './sections';
-import { buildSpacingScale } from './spacing';
 import { recoverMediaQueries } from './stylesheets';
 import { NodeTree } from './tree';
-import { buildFontFamilies, buildTypeScale, headingSizesFrom } from './typography';
 
 const TIMEOUT_MS = Number(process.env.EXTRACT_TIMEOUT_MS ?? 60_000);
 
@@ -61,6 +51,7 @@ async function capture(
   jobId: string,
   takeScreenshot: boolean,
   colorScheme: 'light' | 'dark' = 'light',
+  selector?: string,
 ): Promise<Capture> {
   const viewport = VIEWPORTS[label];
   const session = await openPage(viewport, colorScheme);
@@ -69,7 +60,13 @@ async function capture(
     const failure = describeHttpFailure(status, url);
     if (failure) throw new Error(failure);
 
-    const result = await harvest(session.page, url, viewport);
+    const result = await harvest(session.page, url, viewport, selector);
+    if (selector && result.root && !result.root.found) {
+      throw new Error(
+        `No element matches "${selector}" on ${url}. Open the page, copy a selector from ` +
+          `DevTools (right-click the element → Copy → Copy selector), and try again.`,
+      );
+    }
 
     let screenshotPath: string | undefined;
     let screenshotError: string | undefined;
@@ -93,38 +90,6 @@ async function capture(
   }
 }
 
-function buildDesignSystem(
-  primary: HarvestResult,
-  network: HarvestNetworkEntry[],
-  dark?: HarvestResult,
-): DesignSystem {
-  const palette = buildPalette(primary.nodes);
-  const { scale } = buildTypeScale(primary.nodes);
-  const families = buildFontFamilies(primary.nodes, network, headingSizesFrom(scale));
-
-  let darkPalette = dark ? buildPalette(dark.nodes) : undefined;
-  // Sites that ignore the media query return an identical palette; reporting it
-  // as "dark mode support" would send an agent building a theme that is a copy.
-  if (darkPalette && darkPalette.roles.background === palette.roles.background) {
-    darkPalette = undefined;
-  }
-
-  return {
-    palette,
-    darkPalette,
-    families,
-    typeScale: scale,
-    spacing: buildSpacingScale(primary.nodes),
-    radii: buildRadii(primary.nodes),
-    shadows: buildShadows(primary.nodes),
-    borderWidths: buildBorderWidths(primary.nodes),
-    motion: buildMotion(primary.nodes, primary.keyframes),
-    breakpoints: buildBreakpoints(primary.mediaQueries),
-    container: buildContainer(primary.nodes, primary.viewport.width),
-    sourceVariables: readCssVariables(primary),
-  };
-}
-
 /**
  * Record how each section behaves at a narrower viewport.
  *
@@ -135,6 +100,7 @@ function buildDesignSystem(
 function mergeResponsive(
   sections: SectionSpec[],
   others: { label: ViewportLabel; harvest: HarvestResult }[],
+  scoped = false,
 ): void {
   const desktopColumns = new Map(sections.map((s) => [s.order, s.layout.columns]));
 
@@ -150,7 +116,9 @@ function mergeResponsive(
   }
 
   for (const { label, harvest: other } of others) {
-    const otherSections = buildSections(other);
+    // A scoped harvest holds one element, which the page-level segmenter would
+    // re-classify as generic content at every width.
+    const otherSections = scoped ? [buildComponentSection(other)] : buildSections(other);
     const tree = new NodeTree(other.nodes);
 
     for (const section of sections) {
@@ -214,7 +182,7 @@ export async function runExtraction(
   const primaryLabel: ViewportLabel = viewports.includes('desktop') ? 'desktop' : viewports[0];
 
   onProgress('render', `Rendering at ${primaryLabel} (${VIEWPORTS[primaryLabel].width}px)…`, 12);
-  const primary = await capture(options.url, primaryLabel, jobId, true);
+  const primary = await capture(options.url, primaryLabel, jobId, true, 'light', options.selector);
 
   if (primary.harvest.stats.truncated) {
     warnings.push(
@@ -230,7 +198,7 @@ export async function runExtraction(
   let step = 26;
   for (const label of viewports.filter((v) => v !== primaryLabel)) {
     onProgress('render', `Rendering at ${label} (${VIEWPORTS[label].width}px)…`, step);
-    const shot = await capture(options.url, label, jobId, true);
+    const shot = await capture(options.url, label, jobId, true, 'light', options.selector);
     others.push({ label, harvest: shot.harvest, failed: Boolean(shot.screenshotError) });
     if (shot.screenshotError) {
       warnings.push(`Screenshot at ${label} failed: ${shot.screenshotError}`);
@@ -241,7 +209,9 @@ export async function runExtraction(
   onProgress('dark', 'Checking for a dark theme…', 52);
   let darkHarvest: HarvestResult | undefined;
   try {
-    darkHarvest = (await capture(options.url, primaryLabel, jobId, false, 'dark')).harvest;
+    darkHarvest = (
+      await capture(options.url, primaryLabel, jobId, false, 'dark', options.selector)
+    ).harvest;
   } catch {
     // A dark-mode pass is a bonus; failing it must not fail the extraction.
     warnings.push('Dark-mode capture failed; only the light palette was extracted.');
@@ -335,9 +305,16 @@ export async function analyze(input: AnalysisInput): Promise<ExtractionResult> {
   onProgress('design', 'Inferring the design system…', 62);
   const design = buildDesignSystem(primary, network, dark);
 
-  onProgress('sections', 'Segmenting sections and detecting components…', 74);
-  const sections = buildSections(primary);
-  mergeResponsive(sections, others);
+  // A selector-scoped harvest already holds exactly the element that was asked
+  // for; segmentation would only try to find sections inside it.
+  const scoped = Boolean(primary.root?.selector);
+  onProgress(
+    'sections',
+    scoped ? 'Describing the component…' : 'Segmenting sections and detecting components…',
+    74,
+  );
+  const sections = scoped ? [buildComponentSection(primary)] : buildSections(primary);
+  mergeResponsive(sections, others, scoped);
 
   onProgress('assets', 'Cataloguing fonts, icons and images…', 82);
   const assets = buildAssetManifest(primary, design.families, input.screenshots);
@@ -378,7 +355,11 @@ export async function analyze(input: AnalysisInput): Promise<ExtractionResult> {
     description: 'The complete extraction as machine-readable JSON.',
   });
 
-  const prompt = emitAgentPrompt(page, design, sections, assets, input.contentMode, generated);
+  const prompt = emitAgentPrompt(page, design, sections, assets, input.contentMode, generated, {
+    kind: scoped ? 'component' : 'page',
+    selector: primary.root?.selector,
+    box: sections[0]?.box,
+  });
   const compact = emitCompactPrompt(page, design, sections, input.contentMode, assets);
 
   const files: EmittedFile[] = [prompt, compact, ...generated];
